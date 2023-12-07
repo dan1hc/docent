@@ -1,12 +1,12 @@
 name: ci
 
-if: ${{github.ref == 'refs/heads/main' && github.event_name == 'push'}}
 on: [push]
 
 permissions: write-all
 
 jobs:
   build:
+    if: ${{github.event_name == 'push'}}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -23,12 +23,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: build distribution
-        if: ${{ matrix.python-version != '3.12'}}
+        if: ${{ matrix.python-version != '3.12' || github.ref != 'refs/heads/main'}}
         run: |
           python -m pip install --upgrade pip
           pip wheel . -w dist
       - name: build distribution [docs]
-        if: ${{ matrix.python-version == '3.12'}}
+        if: ${{ matrix.python-version == '3.12' && github.ref == 'refs/heads/main'}}
         run: |
           python -m pip install --upgrade pip
           pip wheel ".[docs]" -w dist
@@ -60,13 +60,13 @@ jobs:
           name: dist-${{ matrix.python-version }}
           path: dist/
       - name: setup dependencies
-        if: ${{ matrix.python-version != '3.12'}}
+        if: ${{ matrix.python-version != '3.12' || github.ref != 'refs/heads/main'}}
         run: |
           python -m pip install --upgrade pip
           pip install pytest
           pip install --no-index --find-links dist/ docent
       - name: setup dependencies [docs]
-        if: ${{ matrix.python-version == '3.12'}}
+        if: ${{ matrix.python-version == '3.12' && github.ref == 'refs/heads/main'}}
         run: |
           python -m pip install --upgrade pip
           pip install pytest
@@ -80,6 +80,7 @@ jobs:
           path: junit/test-results-${{ matrix.python-version }}.xml
         if: ${{ always() }}
   document:
+    if: ${{github.ref == 'refs/heads/main'}}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -112,6 +113,7 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v3
   publish:
+    if: ${{github.ref == 'refs/heads/main'}}
     environment:
       name: pypi
       url: https://pypi.org/p/docent

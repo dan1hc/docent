@@ -1,0 +1,127 @@
+name: ci
+
+if: ${{github.ref == 'refs/heads/main' && github.event_name == 'push'}}
+on: [push]
+
+permissions: write-all
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [
+          '3.9',
+          '3.10',
+          '3.11',
+          '3.12',
+          ]
+    steps:
+      - uses: actions/checkout@v4
+      - name: setup python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: build distribution
+        if: ${{ matrix.python-version != '3.12'}}
+        run: |
+          python -m pip install --upgrade pip
+          pip wheel . -w dist
+      - name: build distribution [docs]
+        if: ${{ matrix.python-version == '3.12'}}
+        run: |
+          python -m pip install --upgrade pip
+          pip wheel ".[docs]" -w dist
+      - name: upload distribution
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist-${{ matrix.python-version }}
+          path: dist
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [
+          '3.9',
+          '3.10',
+          '3.11',
+          '3.12',
+          ]
+    steps:
+      - uses: actions/checkout@v4
+      - name: setup python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: download dist
+        uses: actions/download-artifact@v3
+        with:
+          name: dist-${{ matrix.python-version }}
+          path: dist/
+      - name: setup dependencies
+        if: ${{ matrix.python-version != '3.12'}}
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          pip install --no-index --find-links dist/ docent
+      - name: setup dependencies [docs]
+        if: ${{ matrix.python-version == '3.12'}}
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          pip install --no-index --find-links dist/ docent[docs]
+      - name: pytest
+        run: pytest -v tests --junitxml=junit/test-results-${{ matrix.python-version }}.xml
+      - name: upload pytest test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: pytest-results-${{ matrix.python-version }}
+          path: junit/test-results-${{ matrix.python-version }}.xml
+        if: ${{ always() }}
+  document:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: setup python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      - name: download dist
+        uses: actions/download-artifact@v3
+        with:
+          name: dist-3.12
+          path: dist/
+      - name: setup dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --no-index --find-links dist/ docent[docs]
+      - name: documentation build
+        run: |
+          docent-document docent -a daniel.dube
+          mv docs _site
+      - name: setup pages
+        uses: actions/configure-pages@v4
+      - name: upload pages
+        uses: actions/upload-pages-artifact@v2
+      - name: deploy pages
+        id: deployment
+        uses: actions/deploy-pages@v3
+  publish:
+    environment:
+      name: pypi
+      url: https://pypi.org/p/docent
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: download dist
+        uses: actions/download-artifact@v3
+        with:
+          name: dist-3.9
+          path: dist/
+      - name: publish pypi
+        uses: pypa/gh-action-pypi-publish@release/v1

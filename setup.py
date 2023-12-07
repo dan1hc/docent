@@ -37,7 +37,6 @@ if __name__ == '__main__':
         maintainer_email=AUTHOR_EMAIL,
         classifiers=[
             'Development Status :: 3 - Alpha',
-            'Framework :: Docent',
             'License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)',  # noqa
             'Operating System :: OS Independent',
             'Programming Language :: Python :: 3',

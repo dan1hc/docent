@@ -32,7 +32,7 @@ from .constants import PackageConstants as Constants
 from .objects import DocObject
 from .types import DocMeta
 
-__version__ = '0.0.1a3'
+__version__ = '0.0.1a4'
 
 
 log = logger.get_central_log()

@@ -86,6 +86,6 @@ if __name__ == '__main__':
                 ],
             },
         python_version='>=3.9',
-        url=f'https://python.1howardcapital.com/{PACKAGE_NAME}',
+        url=f'https://{PACKAGE_NAME}.1howardcapital.com/{PACKAGE_NAME}',
         version=VERSION,
         )

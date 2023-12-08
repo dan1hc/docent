@@ -92,26 +92,7 @@ and copy / paste contents for their needs.
 
 ---
 
-## Planned Upcoming Features
-
-1. #### ~~Sphinx / Wiki Documentation Generation~~
-    * ~~While Docent automatically generates valid OpenAPI / SwaggerUI~~
-    ~~for consumers of your API, it is not yet integrated with Sphinx~~
-    ~~to automatically generate documentation in wiki format for internal~~
-    ~~developer teams and product owners.~~
-    * Done!
-2. #### ~~Error Handling Framework~~
-    * ~~The error framework for Docent is still in development as of Dec 5 2023.~~
-    * Done!
-3. #### ~~Default '/healthz' endpoint(s)~~
-    * ~~It is generally best practice for an API to provide a '/healthz' resource~~
-    ~~with simple responses to indicate system availability to consuming~~
-    ~~applications / monitors.~~
-    * Done!
-
----
-
-## Additional Planned Features
+## Planned Features
 
 * #### Authentication / Authorization Framework
     * Although Docent supports the specification of auth components, there

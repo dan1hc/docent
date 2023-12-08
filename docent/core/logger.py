@@ -42,15 +42,19 @@ def get_central_log() -> logging.Logger:
         * Defaults to 'DEBUG' if `Constants.ENV` is either `local` (default) \
         or `dev`, otherwise 'INFO'.
 
-    Rules
-    -----
+    Special Rules
+    -------------
 
     * Can only log `str`, `dict`, and `DocObject` types.
+
+    * Automatically redacts almost all sensitive data, including \
+    api keys, tokens, credit card numbers, connection strings, \
+    secrets; essentially, almost all credentials will be redacted.
 
     * All `warnings` will be filtered through this log and \
     displayed only once.
 
-    * All `print` statements will be silenced _except_ when \
+    * All `print` statements will be silenced *except* when \
     `Constants.ENV` is set to 'local' (its default if `ENV` \
     is unavailable in `os.environ` at runtime).
         \
@@ -198,11 +202,13 @@ def get_central_log() -> logging.Logger:
             (
                 prefix := '\n' + (' ' * Constants.INDENT)
                 ).join(
-                    json.dumps(
-                        msg,
-                        default=utils.prefix_value_to_string,
-                        indent=Constants.INDENT,
-                        sort_keys=True
+                    utils.redact_string(
+                        json.dumps(
+                            msg,
+                            default=utils.prefix_value_to_string,
+                            indent=Constants.INDENT,
+                            sort_keys=True
+                            )
                         ).split('\n')
                     ).replace(
                         Constants.NEW_LINE_TOKEN,

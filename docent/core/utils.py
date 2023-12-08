@@ -6,20 +6,108 @@ __all__ = (
     'is_snake_case',
     'parse_dt',
     'prefix_value_to_string',
+    'redact_log_dict',
+    'redact_string',
     'to_camel_case',
     'to_yaml',
     'snake_case_to_kebab_case',
     )
 
 import datetime
+import re
 import typing
 
 from . import constants
+from . import patterns
 
 
 class Constants(constants.PackageConstants):  # noqa
 
-    pass
+    REDACT_DICT_KEY_PATTERNS = [
+        {
+            'ID': 'api-key-token',
+            'Severity': 'HIGH',
+            'Title': 'API Key',
+            'Regex': re.compile(r"""(?i)(api|secret)+([\S]*[\W_]+)?(key|token)"""),
+            },
+        {
+            'ID': 'authorization-header',
+            'Severity': 'HIGH',
+            'Title': 'Authorization Header',
+            'Regex': re.compile(r"""(?i)(authorization|bearer)+"""),
+            },
+        ]
+    REDACT_LOG_STR_PATTERNS  = [
+        {
+            'ID': 'conn-string-password',
+            'Severity': 'HIGH',
+            'Title': 'Connection String Password',
+            'Regex': re.compile(r"""\w+(:[^:@]+)@"""),
+            },
+        {
+            'ID': 'credit-card',
+            'Severity': 'HIGH',
+            'Title': 'Credit Card',
+            'Regex': re.compile(r"""\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|6(?:011|5[0-9]{2})[0-9]{12}|(?:2131|1800|35\d{3})\d{11})\b"""),
+            },
+        *patterns.REDACTION_PATTERNS
+        ]
+
+
+def redact_string(string: str) -> str:
+    """Redact potentially sensitive values from being logged."""
+
+    for r in Constants.REDACT_LOG_STR_PATTERNS:
+        reason: str = r['Title']
+        regex: re.Pattern = r['Regex']
+        string = regex.sub(
+            repl=f'[ REDACTED :: {reason.upper()} ]',
+            string=string
+            )
+
+    return string
+
+
+def redact_log_dict(
+    obj: typing.Any,
+    ) -> typing.Union[dict, typing.Any]:
+    """Redact potentially sensitive values from being logged (based on dict key)."""  # noqa
+
+    if isinstance(obj, dict):
+        d = {}
+        for k, v in obj.items():
+            if isinstance(v, (dict, list)):
+                d[k] = redact_log_dict(v)
+            elif isinstance(v, str):
+                d[k] = v
+                for r in Constants.REDACT_DICT_KEY_PATTERNS:
+                    regex: re.Pattern = r['Regex']
+                    if regex.search(k) is not None:
+                        reason: str = r['Title']
+                        d[k] = f'[ REDACTED :: {reason.upper()} ]'
+                        break
+            else:
+                d[k] = v
+    elif isinstance(obj, list):
+        d = []
+        for v in obj:
+            if isinstance(v, (dict, list)):
+                d.append(redact_log_dict(v))
+            elif isinstance(v, str):
+                matched = False
+                for r in Constants.REDACT_DICT_KEY_PATTERNS:
+                    regex: re.Pattern = r['Regex']
+                    if regex.search(v) is not None:
+                        reason: str = r['Title']
+                        d.append(f'[ REDACTED :: {reason.upper()} ]')
+                        matched = True
+                        break
+                if not matched:
+                    d.append(v)
+            else:
+                d.append(v)
+
+    return d
 
 
 def parse_dt(dt_string: str) -> datetime.datetime:
@@ -99,7 +187,7 @@ def convert_to_log_format(
             else prefix_value_to_string(v, extra_indentation)
             )
         for k, v
-        in msg.items()
+        in redact_log_dict(msg).items()
         }
 
 

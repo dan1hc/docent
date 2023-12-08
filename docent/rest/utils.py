@@ -52,7 +52,7 @@ def convert_open_api_spec(
                     in v.items()
                     if _k not in unsupported_keywords
                     }
-            elif isinstance(v, list) and not isinstance(v, str):
+            elif isinstance(v, list):
                 d[k] = [
                     convert_open_api_spec(
                         _v,
@@ -92,7 +92,7 @@ def convert_open_api_spec(
                         if _k not in unsupported_keywords
                         }
                     )
-            elif isinstance(v, list) and not isinstance(v, str):
+            elif isinstance(v, list):
                 d.append(
                     [
                         convert_open_api_spec(

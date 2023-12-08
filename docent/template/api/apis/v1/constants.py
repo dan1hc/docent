@@ -12,7 +12,7 @@ class V1Constants(constants.ApiConstants):
         ]
     DEFAULT_AUTHORIZERS: list[docent.rest.objects.security.Authorizer] = [
         docent.rest.objects.security.Authorizer(
-            name='x-docent-template-key',
+            name='x-docent-api-key',
             in_=docent.rest.enums.parameter.In.header.value,
             type=docent.rest.enums.security.SecurityScheme.apiKey.value,
             ),

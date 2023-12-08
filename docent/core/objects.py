@@ -33,7 +33,7 @@ class DocObject(metaclass=types.DocMeta):
 
     * Subclass to create objects for your application.
 
-    * Objects should be 1:1 with their counterparts in the \
+    * Ideally, objects should be 1:1 with their counterparts in the \
     data store from which they are originally sourced (even \
     if that data store is your own database, and even if that \
     data is not ostensibly stored in a 1:1 manner, as is the case \
@@ -140,13 +140,13 @@ class DocObject(metaclass=types.DocMeta):
 
     #### Underscore Prefix for Private Fields
     Fields that begin with an underscore '_' will be ignored on \
-    conversion to / from DBO, REST, and JSON representations \
-    _except_ if the field ends with 'id' or 'id_' (case insensitive), \
+    conversion to / from DBO, REST, and JSON representations, \
+    unless the field ends with 'id' or 'id_' (case insensitive), \
     in which case it will still be converted.
 
     * This follows the broader pattern of flagging methods and \
     attributes as private / internal to a system with a preceding \
-    underscore and it should be expected that end users of your \
+    underscore. It should be expected that end users of your \
     system will not need to interact with these fields.
 
     #### Underscore Suffix for Reserved Keyword Fields

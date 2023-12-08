@@ -269,32 +269,6 @@ class Resource(metaclass=ResourceMeta):  # noqa
 
     ---
 
-    * attribute PATH_PREFICES Class attribute that can be overridden \
-    with a list of strings that will prefix the resource's path.
-
-    * attribute PATH_SUFFICES Class attribute that can be overridden \
-    with a list of strings that will suffix the resource's path.
-
-    * method DELETE_MANY Decorate a function to register it as a DELETE request handler.
-
-    * method DELETE_ONE Decorate a function to register it as a DELETE request handler.
-
-    * method GET_MANY Decorate a function to register it as a GET request handler.
-
-    * method GET_ONE Decorate a function to register it as a GET request handler.
-
-    * method PATCH Decorate a function to register it as a PATCH request handler.
-
-    * method POST_MANY Decorate a function to register it as a POST request handler.
-
-    * method POST_ONE Decorate a function to register it as a POST request handler.
-
-    * method PUT_MANY Decorate a function to register it as a PUT request handler.
-
-    * method PUT_ONE Decorate a function to register it as a PUT request handler.
-
-    ---
-
     Usage
     -----
 
@@ -444,10 +418,9 @@ class Resource(metaclass=ResourceMeta):  # noqa
         response to a user when an invalid request is received.
         \
         * Similarly, `FileNotFoundError` can be raised to return a 404 \
-        error response if nothing could be found to satisfy the user's \
-        valid request.
+        error response.
 
-    Python Exceptions are mapped to HTTP Error as follows:
+    Python Exceptions are mapped to HTTP Errors as follows:
 
     ```py
     ConnectionRefusedError : NotAuthenticatedError(401)
@@ -504,7 +477,7 @@ class Resource(metaclass=ResourceMeta):  # noqa
     ```
 
     * You must implement a classmethod 'resource' property \
-    on any derived class. The classmethod should return the DocObject \
+    on any derived class. The classmethod must return the DocObject \
     derivative to be controlled by the resource. Example below.
 
     ```py

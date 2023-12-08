@@ -38,6 +38,7 @@ import docent.core
 
 from . import constants
 from . import enums
+from . import exceptions
 from . import handler
 from . import healthz
 from . import objects

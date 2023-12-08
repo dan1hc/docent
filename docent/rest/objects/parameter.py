@@ -133,7 +133,6 @@ class Header(Parameter):  # noqa
     def __post_init__(self):
         self._name = f'header.{self.name}'
         self.in_= enums.parameter.In.header.value
-        self.required = True
         self.schema = schema.SchemaComponent(
             type=enums.component.DataType.string.value
             )

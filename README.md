@@ -4,6 +4,8 @@
 
 **Maintainer:** daniel.dube@annalect.com
 
+[**Documentation**](https://docent.1howardcapital.com/docent)
+
 **Summary:** Zero-dependency python framework for object oriented development.
 Implement _once_, document _once_, in _one_ place.
 

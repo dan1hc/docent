@@ -159,7 +159,7 @@ def prefix_value_to_string(v: typing.Any, extra_indentation: int = Constants.IND
 
 def convert_to_log_format(
     msg: dict[str, typing.Any],
-    extra_indentation: int = 0
+    extra_indentation: int = Constants.INDENT
     ) -> dict[str, str]:
     """Recursively convert a dict[str, typing.Any] to dict[str, str]."""
 

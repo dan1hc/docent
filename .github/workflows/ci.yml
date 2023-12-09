@@ -2,20 +2,23 @@ name: ci
 
 on: [push]
 
+env:
+  PY_VERSIONS: |
+    [
+      "3.12",
+      "3.11",
+      "3.10",
+      "3.9"
+    ]
 permissions: write-all
 
 jobs:
   build:
-    if: ${{github.event_name == 'push'}}
+    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [
-          '3.9',
-          '3.10',
-          '3.11',
-          '3.12',
-          ]
+        python-version: ${{ fromJson(github.env.PY_VERSIONS) }}
     steps:
       - uses: actions/checkout@v4
       - name: setup python
@@ -23,12 +26,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: build distribution
-        if: ${{ matrix.python-version != '3.12' || github.ref != 'refs/heads/main'}}
+        if: ${{ matrix.python-version != fromJson(github.env.PY_VERSIONS)[0] || github.ref != 'refs/heads/main' }}
         run: |
           python -m pip install --upgrade pip
           pip wheel . -w dist
       - name: build distribution [docs]
-        if: ${{ matrix.python-version == '3.12' && github.ref == 'refs/heads/main'}}
+        if: ${{ matrix.python-version == fromJson(github.env.PY_VERSIONS)[0] && github.ref == 'refs/heads/main' }}
         run: |
           python -m pip install --upgrade pip
           pip wheel ".[docs]" -w dist
@@ -42,12 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [
-          '3.9',
-          '3.10',
-          '3.11',
-          '3.12',
-          ]
+        python-version: ${{ fromJson(github.env.PY_VERSIONS) }}
     steps:
       - uses: actions/checkout@v4
       - name: setup python
@@ -60,13 +58,13 @@ jobs:
           name: dist-${{ matrix.python-version }}
           path: dist/
       - name: setup dependencies
-        if: ${{ matrix.python-version != '3.12' || github.ref != 'refs/heads/main'}}
+        if: ${{ matrix.python-version != fromJson(github.env.PY_VERSIONS)[0] || github.ref != 'refs/heads/main' }}
         run: |
           python -m pip install --upgrade pip
           pip install pytest
           pip install --no-index --find-links dist/ docent
       - name: setup dependencies [docs]
-        if: ${{ matrix.python-version == '3.12' && github.ref == 'refs/heads/main'}}
+        if: ${{ matrix.python-version == fromJson(github.env.PY_VERSIONS)[0] && github.ref == 'refs/heads/main' }}
         run: |
           python -m pip install --upgrade pip
           pip install pytest
@@ -80,7 +78,7 @@ jobs:
           path: junit/test-results-${{ matrix.python-version }}.xml
         if: ${{ always() }}
   document:
-    if: ${{github.ref == 'refs/heads/main'}}
+    if: ${{ github.ref == 'refs/heads/main' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -91,11 +89,11 @@ jobs:
       - name: setup python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.12'
+          python-version: ${{ fromJson(github.env.PY_VERSIONS)[0] }}
       - name: download dist
         uses: actions/download-artifact@v3
         with:
-          name: dist-3.12
+          name: dist-${{ fromJson(github.env.PY_VERSIONS)[0] }}
           path: dist/
       - name: setup dependencies
         run: |
@@ -113,7 +111,7 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v3
   publish:
-    if: ${{github.ref == 'refs/heads/main'}}
+    if: ${{ github.ref == 'refs/heads/main' }}
     environment:
       name: pypi
       url: https://pypi.org/p/docent
@@ -123,7 +121,7 @@ jobs:
       - name: download dist
         uses: actions/download-artifact@v3
         with:
-          name: dist-3.9
+          name: dist-${{ fromJson(github.env.PY_VERSIONS)[1] }}
           path: dist/
       - name: publish pypi
         uses: pypa/gh-action-pypi-publish@release/v1

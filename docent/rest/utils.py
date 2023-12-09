@@ -324,7 +324,7 @@ def spec_from_api(
                 '\n',
                 ' - '.join(
                     (
-                        '__API created with Docent__',
+                        '__API created with [docent](https://docent.1howardcapital.com/docent)__',
                         f'_v{docent.core.__version__}_',
                         )
                     ),

@@ -15,7 +15,7 @@ jobs:
     steps:
       - id: setVariables
         run: |
-          echo "::set-output name=matrix::${{ env.PY_VERSIONS }}"
+          echo "::set-output name=python-versions::${{ env.PY_VERSIONS }}"
   build:
     needs: setup
     runs-on: ubuntu-latest

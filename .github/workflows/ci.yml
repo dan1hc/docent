@@ -7,12 +7,21 @@ env:
 permissions: write-all
 
 jobs:
-  build:
+  setup:
     if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    outputs:
+      python-versions: ${{ steps.setVariables.outputs.python-versions }}
+    steps:
+      - id: setVariables
+        run: |
+          echo "::set-output name=matrix::${{ env.PY_VERSIONS }}"
+  build:
+    needs: setup
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ${{ fromJson(github.env.PY_VERSIONS) }}
+        python-version: ${{ fromJson(needs.setup.outputs.python-versions) }}
     steps:
       - uses: actions/checkout@v4
       - name: setup python
@@ -20,12 +29,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: build distribution
-        if: ${{ matrix.python-version != fromJson(github.env.PY_VERSIONS)[0] || github.ref != 'refs/heads/main' }}
+        if: ${{ matrix.python-version != fromJson(env.PY_VERSIONS)[0] || github.ref != 'refs/heads/main' }}
         run: |
           python -m pip install --upgrade pip
           pip wheel . -w dist
       - name: build distribution [docs]
-        if: ${{ matrix.python-version == fromJson(github.env.PY_VERSIONS)[0] && github.ref == 'refs/heads/main' }}
+        if: ${{ matrix.python-version == fromJson(env.PY_VERSIONS)[0] && github.ref == 'refs/heads/main' }}
         run: |
           python -m pip install --upgrade pip
           pip wheel ".[docs]" -w dist
@@ -35,11 +44,11 @@ jobs:
           name: dist-${{ matrix.python-version }}
           path: dist
   test:
-    needs: build
+    needs: [setup, build]
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ${{ fromJson(github.env.PY_VERSIONS) }}
+        python-version: ${{ fromJson(needs.setup.outputs.python-versions) }}
     steps:
       - uses: actions/checkout@v4
       - name: setup python
@@ -52,13 +61,13 @@ jobs:
           name: dist-${{ matrix.python-version }}
           path: dist/
       - name: setup dependencies
-        if: ${{ matrix.python-version != fromJson(github.env.PY_VERSIONS)[0] || github.ref != 'refs/heads/main' }}
+        if: ${{ matrix.python-version != fromJson(env.PY_VERSIONS)[0] || github.ref != 'refs/heads/main' }}
         run: |
           python -m pip install --upgrade pip
           pip install pytest
           pip install --no-index --find-links dist/ docent
       - name: setup dependencies [docs]
-        if: ${{ matrix.python-version == fromJson(github.env.PY_VERSIONS)[0] && github.ref == 'refs/heads/main' }}
+        if: ${{ matrix.python-version == fromJson(env.PY_VERSIONS)[0] && github.ref == 'refs/heads/main' }}
         run: |
           python -m pip install --upgrade pip
           pip install pytest
@@ -83,11 +92,11 @@ jobs:
       - name: setup python
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ fromJson(github.env.PY_VERSIONS)[0] }}
+          python-version: ${{ fromJson(env.PY_VERSIONS)[0] }}
       - name: download dist
         uses: actions/download-artifact@v3
         with:
-          name: dist-${{ fromJson(github.env.PY_VERSIONS)[0] }}
+          name: dist-${{ fromJson(env.PY_VERSIONS)[0] }}
           path: dist/
       - name: setup dependencies
         run: |
@@ -115,7 +124,7 @@ jobs:
       - name: download dist
         uses: actions/download-artifact@v3
         with:
-          name: dist-${{ fromJson(github.env.PY_VERSIONS)[1] }}
+          name: dist-${{ fromJson(env.PY_VERSIONS)[1] }}
           path: dist/
       - name: publish pypi
         uses: pypa/gh-action-pypi-publish@release/v1

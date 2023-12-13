@@ -96,6 +96,9 @@ and copy / paste contents for their needs.
 
 ## Planned Features
 
+* #### Automatic Endpoint Suffix for Enums / Schema
+    * Docent should automatically make available resource-level suffices
+    that return enums / schema requirements.
 * #### Authentication / Authorization Framework
     * Although Docent supports the specification of auth components, there
     is currently no functionality that automatically validates a request against
@@ -112,6 +115,52 @@ and copy / paste contents for their needs.
     used tools easier. For example, a docent\[aws\] distribution is planned
     to help users get off the ground quickly with tools like AWS API Gateway
     and AWS Lambda.
+* #### Dunder Access
+    * To be fully pythonic: `DocObject` (and `DocMeta`) should be modified
+    to support querying by special method. In docent's perfect world,
+    there would be only *one* way to query for `DocObjects` in *every*
+    kind of database, and it should essentially work as follows.
+
+        ```py
+        import dataclasses
+
+        import docent.core
+
+        from . import clients
+
+
+        @dataclasses.dataclass
+        class Pet(docent.core.DocObject):  # noqa
+
+            name: str = None
+            weight: float = None
+            ...
+
+        # In this situation, the following should work.
+        query = (Pet.weight > 10) & (Pet.weight <= 20)
+        pets: list[Pet] = clients.Mongo[query.as_mongo]
+
+        # This means a DocObject's __getattribute__(self, __name),
+        # when __name is a member of DocObject.fields,
+        # should return an object (let's call it a DocField)
+        # instead of the DocObject's value for the field.
+
+        # Subsequently, outputs from a DocField's
+        # __gt__, __lte__, etc. should return a Query object
+        # representing the expression. The Query object
+        # should be easily chained with others via & and |
+        # operators.
+
+        # In turn, this Query should then be able to be
+        # translated into some pre-selected subset of db
+        # query languages (pymongo, sqlalchemy, etc) via
+        # some property like query.as_sql.
+
+        # Finally, the actual query language into which the Query
+        # object must be transformed can be determined by the
+        # client implementation consuming it.
+
+        ```
 
 ---
 

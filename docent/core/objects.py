@@ -275,6 +275,18 @@ class DocObject(metaclass=types.DocMeta):
     Returns a dictionary with {fieldName: fieldValue2} for \
     any fields that differ between the two DocObjects.
 
+    ```py
+    value = DocObject['field']
+    ```
+
+    Get value for DocObject field.
+
+    ```py
+    DocObject['field'] = value
+    ```
+
+    Set value for DocObject field.
+
     """
 
     def __init_subclass__(cls):
@@ -329,9 +341,9 @@ class DocObject(metaclass=types.DocMeta):
             ):
             cls.APPLICATION_OBJECTS.setdefault(cls.reference, cls)
 
-        def __repr__(cls) -> str:
+        def __repr__(self) -> str:
             return json.dumps(
-                cls.as_rest,
+                self.as_rest,
                 default=utils.prefix_value_to_string,
                 indent=Constants.INDENT,
                 sort_keys=True
@@ -346,13 +358,73 @@ class DocObject(metaclass=types.DocMeta):
 
         return bool(self - self.__class__())
 
+    def __getitem__(self, key: str) -> typing.Any:
+        """Return field value dict style."""
+
+        if (
+            self.is_snake_case
+            and not key.islower()
+            and (
+                (
+                    k := (
+                        _k := utils.camel_case_to_snake_case(
+                            key.strip('_')
+                            )
+                        )
+                    ) in self.fields
+                or (k := '_' + _k) in self.fields
+                or (k := _k + '_') in self.fields
+                or (k := '_' + _k + '_') in self.fields
+                )
+            ):
+            return self.__dict__[k]
+        elif (
+            (k := (_k := key.strip('_'))) in self.fields
+            or (k := '_' + _k) in self.fields
+            or (k := _k + '_') in self.fields
+            or (k := '_' + _k + '_') in self.fields
+            ):
+            return self.__dict__[k]
+        else:
+            raise KeyError(key)
+
+    def __setitem__(self, key: str, value: typing.Any):
+        """Set field value dict style."""
+
+        if (
+            self.is_snake_case
+            and not key.islower()
+            and (
+                (
+                    k := (
+                        _k := utils.camel_case_to_snake_case(
+                            key.strip('_')
+                            )
+                        )
+                    ) in self.fields
+                or (k := '_' + _k) in self.fields
+                or (k := _k + '_') in self.fields
+                or (k := '_' + _k + '_') in self.fields
+                )
+            ):
+            setattr(self, k, value)
+        elif (
+            (k := (_k := key.strip('_'))) in self.fields
+            or (k := '_' + _k) in self.fields
+            or (k := _k + '_') in self.fields
+            or (k := '_' + _k + '_') in self.fields
+            ):
+            setattr(self, k, value)
+        else:
+            raise KeyError(key)
+
     def __sub__(self, other: 'DocObject') -> dict[str, typing.Any]:
         """Calculate diff between same object types."""
 
         diff = {}
         for field in self.fields:
-            value = getattr(self, field)
-            other_value = getattr(other, field)
+            value = self[field]
+            other_value = other[field]
             if (
                 isinstance(value, DocObject)
                 and isinstance(other_value, DocObject)
@@ -368,8 +440,8 @@ class DocObject(metaclass=types.DocMeta):
 
         obj = other.__class__()
         for field, field_meta in self.fields.items():
-            value = getattr(self, field)
-            other_value = getattr(other, field)
+            value = self[field]
+            other_value = other[field]
             if isinstance(
                 field_meta.default_factory,
                 dataclasses._MISSING_TYPE
@@ -378,11 +450,11 @@ class DocObject(metaclass=types.DocMeta):
             else:
                 default_value = field_meta.default_factory()
             if value != default_value:
-                setattr(obj, field, value)
+                obj[field] = value
             elif other_value != default_value:
-                setattr(obj, field, other_value)
+                obj[field] = other_value
             else:
-                setattr(obj, field, value)
+                obj[field] = value
         return obj
 
     def __rshift__(self, other: 'DocObject') -> 'DocObject':
@@ -390,8 +462,8 @@ class DocObject(metaclass=types.DocMeta):
 
         obj = other.__class__()
         for field, field_meta in self.fields.items():
-            value = getattr(self, field)
-            other_value = getattr(other, field)
+            value = self[field]
+            other_value = other[field]
             if isinstance(
                 field_meta.default_factory,
                 dataclasses._MISSING_TYPE
@@ -400,9 +472,9 @@ class DocObject(metaclass=types.DocMeta):
             else:
                 default_value = field_meta.default_factory()
             if other_value != default_value:
-                setattr(obj, field, other_value)
+                obj[field] = other_value
             else:
-                setattr(obj, field, value)
+                obj[field] = value
         return obj
 
     def _to_dbo(

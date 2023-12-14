@@ -486,9 +486,12 @@ def sort_on_last_field(k: typing.Union[str, dict]) -> str:  # noqa
         k = k.get('$ref')
     if not k:
         return 'Z'
-    return k.split(
-        Constants.DOC_DELIM
-        )[-1].split(Constants.FIELD_DELIM)[-1]
+    elif isinstance(k, str):
+        return k.split(
+            Constants.DOC_DELIM
+            )[-1].split(Constants.FIELD_DELIM)[-1]
+    else:
+        return str(k)
 
 
 def extract_path_parameters(path: str) -> dict[str, str]:  # noqa

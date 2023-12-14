@@ -2,7 +2,7 @@ import os
 
 
 class PackageConstants:
-    """Constant values across all of Docent."""
+    """Constant values across all of docent."""
 
     DOC_DELIM      = '-'
     ENV            = os.getenv('ENV', 'local').lower()

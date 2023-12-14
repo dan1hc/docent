@@ -25,7 +25,7 @@ Implement _once_, document _once_, in _one_ place.
 > subsidiaries via publication to the Python Software Foundation's
 > publicly distributed Python Package Index.
 >
-> With Docent, you will quickly learn established best practice...
+> With docent, you will quickly learn established best practice...
 > or face the consequences of runtime errors that will break your code
 > if you deviate from it.
 >
@@ -33,7 +33,7 @@ Implement _once_, document _once_, in _one_ place.
 > that expects and rewards intuitive magic method implementations,
 > consistent type annotations, and robust docstrings.
 >
-> Implement _pythonically_ with Docent and you will only ever need to:
+> Implement _pythonically_ with docent and you will only ever need to:
 > implement _once_, document _once_, in _one_ place.
 
 ---
@@ -57,7 +57,7 @@ $ pip install .
 
 ### The Template
 
-Docent ships with a template API and python package. \
+docent ships with a template API and python package. \
 You can immediately run the template API from the command line with:
 
 ```sh

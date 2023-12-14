@@ -19,14 +19,14 @@ from . import utils
 
 class Constants(constants.PackageConstants):  # noqa
 
-    SILENCE_MSG = 'Call to print() silenced by Docent.'
-    WARN_MSG    = 'Calls to print() will be silenced by Docent.'
+    SILENCE_MSG = 'Call to print() silenced by docent.'
+    WARN_MSG    = 'Calls to print() will be silenced by docent.'
 
 
 @functools.lru_cache(maxsize=1)
 def get_central_log() -> logging.Logger:
     """
-    Core Docent logger.
+    Core docent logger.
 
     Usage
     -----
@@ -156,7 +156,7 @@ def get_central_log() -> logging.Logger:
             msg = {msg.__name__: msg}
         elif not isinstance(msg, dict):
             raise exceptions.InvalidLogMessageTypeError(
-                'Docent can only log: `dict, str, DocObject` types.'
+                'docent can only log: `dict, str, DocObject` types.'
                 )
 
         if isinstance(exc_info, BaseException):

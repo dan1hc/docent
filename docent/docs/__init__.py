@@ -6,7 +6,7 @@ Overview
 
 **Maintainer:** daniel.dube@annalect.com
 
-**Summary:** Docent extension for generating wiki documentation with [Sphinx](https://www.sphinx-doc.org).
+**Summary:** docent extension for generating wiki documentation with [Sphinx](https://www.sphinx-doc.org).
 
 ---
 

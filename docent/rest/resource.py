@@ -45,7 +45,7 @@ def _prepare_method(
             ' '.join(
                 (
                     f'Function {event_handler_function!s} missing',
-                    'return signature. Docent requires all functions',
+                    'return signature. docent requires all functions',
                     'decorated with a REST method to be annotated with a',
                     'return signature.'
                     )
@@ -247,23 +247,7 @@ def _prepare_method(
             )
 
 
-class ResourceMeta(objects.base.ComponentMeta):  # noqa
-
-    def __getitem__(
-        cls,
-        request: 'objects.request.Request'
-        ) -> tuple[docent.core.objects.DocObject, int]:
-        return cls.process_request(request)
-
-    @classmethod
-    def process_request(
-        cls,
-        request: 'objects.request.Request'
-        ) -> tuple[docent.core.objects.DocObject, int]:  # noqa
-        ...
-
-
-class Resource(metaclass=ResourceMeta):  # noqa
+class Resource(metaclass=objects.base.ComponentMeta):  # noqa
     """
     A RESTful Resource.
 
@@ -411,7 +395,7 @@ class Resource(metaclass=ResourceMeta):  # noqa
     to automatically generate an error response with the correcr error \
     code and message for the situation.
 
-    * Additionally, Docent is built to convert builtin python exceptions \
+    * Additionally, docent is built to convert builtin python exceptions \
     into sensible HTTP counterparts.
         \
         * For example, `SyntaxError` can be raised to return a 400 error \
@@ -564,12 +548,6 @@ class Resource(metaclass=ResourceMeta):  # noqa
             )
 
         return super().__init_subclass__()
-
-    def __getitem__(
-        self,
-        request: 'objects.request.Request'
-        ) -> tuple[docent.core.objects.DocObject, int]:  # noqa
-        return self.__class__[request]
 
     @classmethod
     def DELETE_MANY(
@@ -836,109 +814,6 @@ class Resource(metaclass=ResourceMeta):  # noqa
         return _wrapper
 
     @classmethod
-    def process_request(
-        cls,
-        request: 'objects.request.Request'
-        ) -> tuple[docent.core.objects.DocObject, int]:  # noqa
-        try:
-            request_id = uuid.uuid4().hex
-            docent.core.log.info(
-                {
-                    'request_id': request_id,
-                    'resource': cls.__name__,
-                    'message': 'validating request',
-                    'request': request,
-                    }
-                )
-
-            if request.method.lower() == 'post':
-                path_key = 'NO_ID'
-            else:
-                path_key = cls.validate_path(request.path_as_list)
-
-            path_obj = cls.PATHS[
-                '.'.join((cls.__module__, cls.__name__))
-                ][path_key]
-            path_obj.validate_method(request.method, request.path)
-
-            method_obj: objects.method.Method = getattr(
-                path_obj,
-                request.method.lower()
-                )
-
-            parameters = {}
-
-            if request.headers:
-                parameters.update(request.headers)
-            if request.params:
-                parameters.update(request.params)
-
-            if parameters:
-                method_obj.validate_against_schema('parameters', parameters)
-            if request.body:
-                method_obj.validate_against_schema('body', request.body)
-
-            (
-                request_body,
-                request_params
-                ) = method_obj.parse_request_dtypes(
-                    request.body,
-                    request.params
-                    )
-            request.body = request_body
-            request.params = request_params
-            docent.core.log.info(
-                {
-                    'request_id': request_id,
-                    'resource': cls.__name__,
-                    'message': 'processing validated request',
-                    'request': request
-                    }
-                )
-            response_obj = method_obj(request)
-            status_code = Constants.METHOD_SUCCESS_CODES.get(
-                request.method.lower(),
-                200
-                )
-            docent.core.log.info(
-                {
-                    'request_id': request_id,
-                    'resource': cls.__name__,
-                    'message': 'request processed successfully',
-                    'status_code': str(status_code),
-                    'response': response_obj,
-                    },
-                )
-        except Exception as exception:
-            api_module = cls.__module__.split('.')[0]
-            most_recent_trace = traceback.format_tb(
-                exception.__traceback__
-                )[-1]
-            if len(spl := most_recent_trace.strip().split(', ')) != 3:
-                is_error_raised = False
-            else:
-                file_name, _, trace = spl
-                is_error_raised = ' raise ' in trace
-                is_error_from_api = api_module in file_name
-            if is_error_raised or is_error_from_api:
-                response_obj = objects.response.Error.from_exception(exception)
-            else:
-                response_obj = objects.response.Error.from_exception(
-                    exceptions.UnexpectedError
-                    )
-            status_code = response_obj.errorCode
-            docent.core.log.error(
-                {
-                    'request_id': request_id,
-                    'resource': cls.__name__,
-                    'message': 'error processing request',
-                    'status_code': str(status_code),
-                    'response': response_obj,
-                    },
-                )
-        return response_obj, status_code
-
-    @classmethod
     def validate_path(
         cls,
         request_path_as_list: list[str]
@@ -1000,6 +875,7 @@ class Resource(metaclass=ResourceMeta):  # noqa
         in 'id' or 'id_' (case insensitive).
         """
 
+        cls.resource: docent.core.objects.DocObject
         if (
             cls.resource.reference
             == 'docent-rest-healthz-resource-heartBeat'
@@ -1018,16 +894,11 @@ class Resource(metaclass=ResourceMeta):  # noqa
                         )
                     )
                 )
-            and (
-                (_k := k.strip('_')) in cls.resource.fields
-                or ('_' + _k) in cls.resource.fields
-                or (_k + '_') in cls.resource.fields
-                or ('_' + _k + '_') in cls.resource.fields
-                )
+            and k in cls.resource
             ):
             return k
-        else:
-            return sorted(
+        elif (
+            ordering := sorted(
                 (
                     f
                     for f
@@ -1035,7 +906,11 @@ class Resource(metaclass=ResourceMeta):  # noqa
                     if f.strip('_').lower().endswith('id')
                     ),
                 key=lambda k: len(k)
-                )[0]
+                )
+            ):
+            return ordering[0]
+        else:
+            return k
 
     @classmethod
     @property

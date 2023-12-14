@@ -1,5 +1,3 @@
-import warnings
-
 from .. import objects
 
 from . import constants

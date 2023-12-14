@@ -29,11 +29,11 @@ VALID_FLAGS = (
 
 HELP_TEXT = '\n'.join(
     (
-        'Docent REST CLI - Usage',
+        'docent REST CLI - Usage',
         '-----------------------',
         ' '.join(
             (
-                'Specify a python package for Docent to parse for an API.',
+                'Specify a python package for docent to parse for an API.',
                 )
             ),
         ' '.join(
@@ -118,7 +118,7 @@ HELP_TEXT = '\n'.join(
             (
                 '--verbose (-v)',
                 '::',
-                'Docent CLI output verbosity.',
+                'docent CLI output verbosity.',
                 )
             ),
         '----------------------------',
@@ -133,7 +133,7 @@ def convert():
 
     ---
 
-    Specify a python package for Docent to parse for an API.
+    Specify a python package for docent to parse for an API.
 
     ```sh
     $ docent-convert docent.template.api
@@ -185,7 +185,7 @@ def convert():
         with open(file_path, 'w') as f:
             f.write(yaml)
 
-        docent.core.log.info('Docent --> OpenAPI.yaml :: SUCCESS')
+        docent.core.log.info('docent --> OpenAPI.yaml :: SUCCESS')
         docent.core.log.info(f'API FILE :: {file_path}')
         docent.core.log.info(f'API FILE PATH :: {os.path.abspath(file_path)}')
 
@@ -199,7 +199,7 @@ def serve():
 
     ---
 
-    Specify the name of your API package to serve it via Docent's \
+    Specify the name of your API package to serve it via docent's \
     simple http server.
 
     ```sh

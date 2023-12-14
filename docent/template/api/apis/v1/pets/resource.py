@@ -12,10 +12,12 @@ class Constants(constants.PetsNameSpaceConstants):
     """Constant values specific only to the Pets resource."""
 
 
-@docent.rest.Route
+@docent.rest.Route(
+    include_enums_endpoint=True,
+    )
 class Pets(docent.rest.Resource):
     """
-    An example of a Docent RESTful resource to manage pets.
+    An example of a docent RESTful resource to manage pets.
 
     * This python docstring will populate the RESTful resource's \
     "Details" section, overriding all other descriptions \

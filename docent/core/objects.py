@@ -5,6 +5,7 @@ __all__ = (
 
 import abc
 import dataclasses
+import enum
 import functools
 import json
 import re
@@ -24,7 +25,7 @@ class Constants(constants.PackageConstants):  # noqa
 @dataclasses.dataclass
 class DocObject(metaclass=types.DocMeta):
     """
-    Base Docent Object.
+    Base docent Object.
 
     ---
 
@@ -68,7 +69,7 @@ class DocObject(metaclass=types.DocMeta):
         \"""A pet.\"""
 
         id_: str = None  # Trailing underscores are special
-                         # in Docent, check the documentation
+                         # in docent, check the documentation
                          # below for more detail.
         name: str = None
         type: str = None
@@ -287,6 +288,13 @@ class DocObject(metaclass=types.DocMeta):
 
     Set value for DocObject field.
 
+    ```py
+    field in DocObject
+    ```
+
+    Returns True if any one of field, _field, field_, or _field_
+    is a valid field for the DocObject, otherwise False.
+
     """
 
     def __init_subclass__(cls):
@@ -361,29 +369,7 @@ class DocObject(metaclass=types.DocMeta):
     def __getitem__(self, key: str) -> typing.Any:
         """Return field value dict style."""
 
-        if (
-            self.is_snake_case
-            and not key.islower()
-            and (
-                (
-                    k := (
-                        _k := utils.camel_case_to_snake_case(
-                            key.strip('_')
-                            )
-                        )
-                    ) in self.fields
-                or (k := '_' + _k) in self.fields
-                or (k := _k + '_') in self.fields
-                or (k := '_' + _k + '_') in self.fields
-                )
-            ):
-            return self.__dict__[k]
-        elif (
-            (k := (_k := key.strip('_'))) in self.fields
-            or (k := '_' + _k) in self.fields
-            or (k := _k + '_') in self.fields
-            or (k := '_' + _k + '_') in self.fields
-            ):
+        if (k := self.__class__.key_for(key)):
             return self.__dict__[k]
         else:
             raise KeyError(key)
@@ -391,29 +377,7 @@ class DocObject(metaclass=types.DocMeta):
     def __setitem__(self, key: str, value: typing.Any):
         """Set field value dict style."""
 
-        if (
-            self.is_snake_case
-            and not key.islower()
-            and (
-                (
-                    k := (
-                        _k := utils.camel_case_to_snake_case(
-                            key.strip('_')
-                            )
-                        )
-                    ) in self.fields
-                or (k := '_' + _k) in self.fields
-                or (k := _k + '_') in self.fields
-                or (k := '_' + _k + '_') in self.fields
-                )
-            ):
-            setattr(self, k, value)
-        elif (
-            (k := (_k := key.strip('_'))) in self.fields
-            or (k := '_' + _k) in self.fields
-            or (k := _k + '_') in self.fields
-            or (k := '_' + _k + '_') in self.fields
-            ):
+        if (k := self.__class__.key_for(key)):
             setattr(self, k, value)
         else:
             raise KeyError(key)
@@ -596,52 +560,8 @@ class DocObject(metaclass=types.DocMeta):
                     rest_obj
                     )
                 )
-        if cls.isCamelCase:
-            return cls.from_dict(
-                {
-                    k: v
-                    for _k, v
-                    in rest_obj.items()
-                    if (
-                        (
-                            (k := _k) in cls.fields
-                            or (k := k + '_') in cls.fields
-                            )
-                        or (
-                            _k.lower().endswith('id')
-                            and (
-                                (k := '_' + _k) in cls.fields
-                                or (k := k + '_') in cls.fields
-                                )
-                            )
-                        )
-                    }
-                )
-        elif cls.is_snake_case:
-            return cls.from_dict(
-                {
-                    k: v
-                    for _k, v
-                    in rest_obj.items()
-                    if (
-                        (
-                            (
-                                k := utils.camel_case_to_snake_case(_k)
-                                ) in cls.fields
-                            or (k := k + '_') in cls.fields
-                            )
-                        or (
-                            _k.lower().endswith('id')
-                            and (
-                                (
-                                    k := '_' + utils.camel_case_to_snake_case(_k)
-                                    ) in cls.fields
-                                or (k := k + '_') in cls.fields
-                                )
-                            )
-                        )
-                    }
-                )
+
+        return cls.from_dict(rest_obj)
 
     @classmethod
     def from_dict(cls, d: dict[str, typing.Any]) -> 'DocObject':
@@ -650,16 +570,31 @@ class DocObject(metaclass=types.DocMeta):
         return cls(
             **{
                 k: v
-                for __k, v
+                for _k, v
                 in d.items()
-                if (
-                    (k := (_k := __k.strip('_'))) in cls.fields
-                    or (k := '_' + _k) in cls.fields
-                    or (k := _k + '_') in cls.fields
-                    or (k := '_' + _k + '_') in cls.fields
-                    )
+                if (k := cls.key_for(_k))
                 }
             )
+
+    @classmethod
+    @property
+    @functools.lru_cache(maxsize=1)
+    def enumerations(cls) -> dict[str, list]:
+        """Dictionary containing all enums for object."""
+
+        d: dict[str, list] = {}
+        for k, field in cls.fields.items():
+            if (
+                (field_enum := field.metadata.get('enum'))
+                and isinstance(field_enum, enum.EnumMeta)
+                ):
+                d[k] = [e.value for e in field_enum]
+            elif field_enum:
+                d[k] = list(field_enum)
+            if d.get(k) and field.metadata.get('nullable', True):
+                d[k].append(None)
+
+        return d
 
     @classmethod
     @property
@@ -683,7 +618,7 @@ class DocObject(metaclass=types.DocMeta):
     @functools.lru_cache(maxsize=1)
     def distribution(cls) -> str:
         """
-        The Docent distribution to which the object belongs, or,
+        The docent distribution to which the object belongs, or,
         if the object is a member of another package, the name
         of that package.
         """
@@ -778,7 +713,7 @@ class DocObject(metaclass=types.DocMeta):
 @dataclasses.dataclass
 class DocRecords(abc.ABC, DocObject):
     """
-    Base Docent Container Object.
+    Base docent Container Object.
 
     ---
 

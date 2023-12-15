@@ -1,3 +1,8 @@
+__all__ = (
+    'Flea',
+    'Pet',
+    )
+
 import dataclasses
 
 import docent.core
@@ -160,5 +165,74 @@ class Pet(docent.core.DocObject):
         ```
 
         """
+
+        return cls(**(clients.DatabaseClient.find_one(_id) or {}))
+
+
+@dataclasses.dataclass
+class Flea(docent.core.DocObject):
+    """
+    Sometimes pets get fleas.
+
+    * Fleas are a bummer.
+
+    ---
+
+    Requirements
+    ------------
+
+    Allowed names:
+
+    ```py
+    ['FLEA']
+    ```
+
+    Allowed types:
+
+    ```py
+    ['flea']
+    ```
+
+    """
+
+    _id: str = None  # Fleas with IDs...
+    pet_id: str = dataclasses.field(
+        default=None,
+        metadata={
+            'ignore': True,  # Expectation is this will be passed
+            }                # in any request handling logic.
+        )
+
+    name: str = dataclasses.field(
+        default='FLEA',
+        metadata={
+            'enum': [
+                'FLEA',
+                ],
+            'required': {
+                'post',
+                },
+            'nullable': False,
+            'strictEnum': True,  # You can make fleas... but they must be FLEA.
+            }
+        )
+
+    type: str = dataclasses.field(
+        default='flea',
+        metadata={
+            'enum': [
+                'flea',
+                ],
+            'required': {
+                'post',
+                },
+            'nullable': False,
+            'strictEnum': True,  # You can make fleas... but they must be fleas.
+            }
+        )
+
+    @classmethod
+    def from_id(cls, _id: str) -> 'Flea':
+        """Return an instantiated Flea object from database by id."""
 
         return cls(**(clients.DatabaseClient.find_one(_id) or {}))

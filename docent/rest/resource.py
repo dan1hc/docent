@@ -2,6 +2,7 @@ __all__ = (
     'Resource',
     )
 
+import dataclasses
 import functools
 import re
 import typing
@@ -516,7 +517,7 @@ class Resource(metaclass=objects.base.ComponentMeta):  # noqa
                 )
 
         if (
-            (l := cls.__name__.lower()) == 'docs'
+            'docs' in (l := cls.__name__.lower())
             or 'favicon' in l
             ):
             raise exceptions.ReservedKeywordError(
@@ -875,124 +876,6 @@ class Resource(metaclass=objects.base.ComponentMeta):  # noqa
             return _wrapper
 
     @classmethod
-    def apply_authorizers(
-        cls,
-        authorizers: list[objects.security.Authorizer]
-        ):
-        """Apply authorizer to all resource methods."""
-
-        security = [
-            {auth._name: []}
-            for auth
-            in (authorizers or [])
-            ]
-
-        method_obj: objects.method.Method
-        for method_obj in cls.methods:
-            for authorizer in security:
-                if (
-                    method_obj.security_
-                    and authorizer not in method_obj.security_
-                    ):
-                    method_obj.security_.append(authorizer)
-                elif not method_obj.security_:
-                    method_obj.security_ = [authorizer]
-
-    @classmethod
-    def apply_integrations(
-        cls,
-        integrations: list[objects.base.Component]
-        ):
-        """Apply integrations to all resource methods."""
-
-        method_obj: objects.method.Method
-        for method_obj in cls.methods:
-            for integration in integrations:
-                if integration not in method_obj:
-                    method_obj._extensions.append(integration)
-
-    @classmethod
-    def apply_request_headers(
-        cls,
-        request_headers: objects.parameter.Parameters
-        ):
-        """Apply request headers to all resource methods."""
-
-        method_obj: objects.method.Method
-        for method_obj in cls.methods:
-            if (
-                method_obj.parameters
-                and isinstance(method_obj.parameters, list)
-                ):
-                refs: set[str] = {d['$ref'] for d in method_obj.parameters}
-                for param_ref in request_headers.as_reference:
-                    if param_ref['$ref'] not in refs:
-                        method_obj.parameters.append(param_ref)
-                method_obj.parameters = sorted(
-                    method_obj.parameters,
-                    key=utils.sort_on_last_field
-                    )
-            elif (
-                method_obj.parameters
-                and isinstance(
-                    method_obj.parameters,
-                    objects.parameter.Parameters
-                    )
-                ):
-                method_obj.parameters += request_headers
-                method_obj.parameters = sorted(
-                    method_obj.parameters.as_reference,
-                    key=utils.sort_on_last_field
-                    )
-            else:
-                method_obj.parameters = sorted(
-                    request_headers.as_reference,
-                    key=utils.sort_on_last_field
-                    )
-
-    @classmethod
-    def apply_response_headers(
-        cls,
-        response_headers: objects.response.Headers
-        ):
-        """Apply response headers to all resource methods."""
-
-        method_obj: objects.method.Method
-        for method_obj in cls.methods:
-            if method_obj._response_headers:
-                method_obj._response_headers += response_headers
-            else:
-                method_obj._response_headers = response_headers
-
-    @classmethod
-    def apply_errors(
-        cls,
-        errors: list[Exception]
-        ):
-        """Apply error responses to all resource methods."""
-
-        for with_id, path_obj in cls.PATHS[cls.resource_key].items():
-            for method_name in {'delete', 'get', 'patch', 'post', 'put'}:
-                if (method_obj := getattr(path_obj, method_name)) is not None:
-                    method_obj: objects.method.Method
-                    error_responses = objects.response.Responses(
-                        _extensions=[
-                            objects.response.ResponseSpec.from_exception(
-                                exception,
-                                method_name,
-                                path_obj._name,
-                                many=with_id == 'NO_ID',
-                                )
-                            for exception
-                            in errors
-                            ]
-                        )
-                    if method_obj.responses:
-                        method_obj.responses += error_responses
-                    else:
-                        method_obj.responses = error_responses
-
-    @classmethod
     def validate_path(
         cls,
         request_path_as_list: list[str]
@@ -1099,7 +982,14 @@ class Resource(metaclass=objects.base.ComponentMeta):  # noqa
     @property
     @functools.lru_cache(maxsize=1)
     def resource_key(cls) -> str:  # noqa
-        return '.'.join((cls.__module__, cls.__name__))
+        # return '.'.join((cls.__module__, cls.__name__))
+        return '.'.join(
+            (
+                cls.__module__,
+                *[prefix.lower() for prefix in cls.PATH_PREFICES],
+                cls.__name__
+                )
+            )
 
     @classmethod
     @property
@@ -1148,11 +1038,10 @@ class Resource(metaclass=objects.base.ComponentMeta):  # noqa
     @property
     @functools.lru_cache(maxsize=1)
     def tags(cls) -> list[str]:  # noqa
-        split_string = re.sub(
-            Constants.PATH_ID_PARSE_EXPR,
+        split_string = Constants.PATH_ID_PARSE_EXPR.sub(
             '',
             cls.path_schema
-            ).strip('/').split('/')
+            ).replace('//', '/').strip('/').split('/')
         return [
             Constants.TAG_DELIM.join(
                 [
@@ -1180,17 +1069,38 @@ class Resource(metaclass=objects.base.ComponentMeta):  # noqa
     def as_enum(cls) -> 'Resource':
         """Return an Enumeration resource for the managed object."""
 
+        @dataclasses.dataclass
+        class Enumeration(docent.core.objects.DocObject):
+            """Contains documented object enums."""
+
+            name: str = dataclasses.field(
+                default=None,
+                metadata={
+                    'ignore': True,
+                    }
+                )
+            values: list = dataclasses.field(
+                default_factory=list,
+                metadata={
+                    'ignore': True,
+                    }
+                )
+
+        Enumeration.__name__ = cls.resource.__name__ + 'Enumeration'
+
         class Enums(Resource):  # noqa
 
             PATH_PREFICES = [
-                *cls.PATH_PREFICES,
-                cls.__name__.lower()
+                prefix
+                for prefix
+                in cls.path_schema.strip('/').split('/')
+                if Constants.PATH_ID_PARSE_EXPR.search(prefix) is None
                 ]
 
             @classmethod
             @property
-            def resource(cls) -> objects.enumeration.Enumeration:  # noqa
-                return objects.enumeration.Enumeration
+            def resource(cls) -> Enumeration:  # noqa
+                return Enumeration
 
         for ext in Constants.EXTENSIONS:
             extension = getattr(Enums, ext)
@@ -1200,11 +1110,11 @@ class Resource(metaclass=objects.base.ComponentMeta):  # noqa
         @Enums.GET_MANY
         def get_enums(
             request: objects.Request
-            ) -> list[objects.enumeration.Enumeration]:
+            ) -> list[Enumeration]:
             """Retrieve all enumerated field values for the object."""
 
             return [
-                objects.enumeration.Enumeration(name=k, values=v)
+                Enumeration(name=k, values=v)
                 for k, v
                 in cls.resource.enumerations.items()
                 ]

@@ -1,5 +1,6 @@
 __all__ = (
     'Swagger',
+    'SwaggerMeta',
     'SwaggerHTML',
     'SwaggerICON',
     'SwaggerJSON',
@@ -77,7 +78,12 @@ class SwaggerYAML(docent.core.objects.DocObject):  # noqa
         self.data = yaml
 
 
-class Swagger(metaclass=base.ComponentMeta):  # noqa
+class SwaggerMeta(type):  # noqa
+
+    pass
+
+
+class Swagger(metaclass=SwaggerMeta):  # noqa
 
     PATH_PREFICES: list[str] = []
     PATH_SUFFICES: list[str] = []

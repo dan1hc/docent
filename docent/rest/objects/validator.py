@@ -319,7 +319,13 @@ class SchemaValidator(base.Component):  # noqa
                             and method_name in nullable
                             )
                         )
-                    or method_name in ignorance
+                    or (
+                        ignorance
+                        or (
+                            hasattr(ignorance, '__iter__')
+                            and method_name in ignorance
+                            )
+                        )
                     )
                 )
 

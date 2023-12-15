@@ -1,5 +1,6 @@
 import datetime
 import decimal
+import re
 
 import docent.core
 
@@ -70,8 +71,8 @@ class FrameworkConstants(docent.core.Constants):  # noqa
     NAMED_COMPONENTS: set[str]                               = {
         'parameter',
         }
-    PATH_ID_PARSE_EXPR                                       = r'(/{)\w+(})'
-    PATH_ID_GROUP_EXPR                                       = r'{(\w+)}'
+    PATH_ID_PARSE_EXPR                                       = re.compile(r'({)\w+(})')
+    PATH_ID_GROUP_EXPR                                       = re.compile(r'{(\w+)}')
     REST_TYPES: dict[object, dict[str, str]]                 = {
         bool: {
             'type': 'boolean',

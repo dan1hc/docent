@@ -3,7 +3,6 @@ __all__ = (
     'APIMeta',
     )
 
-import re
 import traceback
 import typing
 import uuid
@@ -71,16 +70,31 @@ class APIMeta(type):  # noqa
         cls.APPLICATION_RESOURCES: list[tuple[str, set[int], resource.Resource]]  # noqa
         cls.APPLICATION_RESOURCES.append(
             (
-                re.sub(
-                    Constants.PATH_ID_PARSE_EXPR,
-                    '',
-                    rsc.path_schema
-                    ).strip('/'),
+                rsc.path_schema,
                 {
                     i
                     for i, v
                     in enumerate(rsc.path_schema.split('/'))
-                    if v.startswith('{') and v.endswith('}')
+                    if Constants.PATH_ID_PARSE_EXPR.search(v) is not None
+                    },
+                rsc
+                )
+            )
+        cls.APPLICATION_RESOURCES.append(
+            (
+                (
+                    id_schema := '/'.join(
+                        (
+                            rsc.path_schema,
+                            '{' + rsc._resource_id + '}'
+                            )
+                        )
+                    ),
+                {
+                    i
+                    for i, v
+                    in enumerate(id_schema.split('/'))
+                    if Constants.PATH_ID_PARSE_EXPR.search(v) is not None
                     },
                 rsc
                 )
@@ -88,19 +102,15 @@ class APIMeta(type):  # noqa
 
         if kwargs.get('include_enums_endpoint'):
 
+            path_schema = Constants.PATH_ID_PARSE_EXPR.sub(
+                '',
+                rsc.as_enum.path_schema
+                ).replace('//', '/').strip('/')
+
             cls.APPLICATION_RESOURCES.append(
                 (
-                    re.sub(
-                        Constants.PATH_ID_PARSE_EXPR,
-                        '',
-                        rsc.as_enum.path_schema
-                        ).strip('/'),
-                    {
-                        i
-                        for i, v
-                        in enumerate(rsc.as_enum.path_schema.split('/'))
-                        if v.startswith('{') and v.endswith('}')
-                        },
+                    path_schema,
+                    set(),
                     rsc.as_enum
                     )
                 )
@@ -233,38 +243,31 @@ class API(metaclass=APIMeta):
             ):
             return objects.documentation.Swagger
 
+        affixes: list[str] = []
+        for (_, _, rsc) in cls.APPLICATION_RESOURCES:
+            affixes.extend(rsc.PATH_PREFICES)
+            affixes.extend(rsc.PATH_SUFFICES)
+            affixes.append(rsc.__name__.lower())
+
         for resource_meta in cls.APPLICATION_RESOURCES:
             if (
                 resource_meta[0] == 'healthz'
                 and not request_path_as_list
                 ):
                 return resource_meta[2]
-            elif (
-                request_path_as_list[-1] == 'enums'
-                and not resource_meta[0].endswith('enums')
-                ):
-                continue
-            elif len(request_path_as_list) > (
-                len(s := resource_meta[0].split('/'))
-                + len(resource_meta[1])
-                + 1
-                ):
-                continue
-            elif len(request_path_as_list) < (
-                len(s := resource_meta[0].split('/'))
-                + len(resource_meta[1])
-                ):
-                continue
 
             path_trimmed = '/'.join(
                 [
-                    v
+                    (
+                        resource_meta[0].split('/')[i]
+                        if (
+                            i in resource_meta[1]
+                            and v not in affixes
+                            )
+                        else v
+                        )
                     for i, v
                     in enumerate(request_path_as_list)
-                    if (
-                        i not in resource_meta[1]
-                        and i < len(s)
-                        )
                     ]
                 )
 
@@ -447,9 +450,7 @@ class API(metaclass=APIMeta):
         else:
             path_key = rsc.validate_path(request.path_as_list)
 
-        path_obj = rsc.PATHS[
-            '.'.join((rsc.__module__, rsc.__name__))
-            ][path_key]
+        path_obj = rsc.PATHS[rsc.resource_key][path_key]
         path_obj.validate_method(request.method, request.path)
 
         method_obj: 'objects.method.Method' = getattr(

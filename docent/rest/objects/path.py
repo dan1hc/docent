@@ -2,7 +2,6 @@ __all__ = (
     'Path',
     )
 
-import re
 import typing
 
 from .. import enums
@@ -61,10 +60,7 @@ class Path(base.Component):  # noqa
                     required=True
                     )
                 for path_parameter
-                in re.findall(
-                    Constants.PATH_ID_GROUP_EXPR,
-                    self._name
-                    )
+                in Constants.PATH_ID_GROUP_EXPR.findall(self._name)
                 ]
             )
 

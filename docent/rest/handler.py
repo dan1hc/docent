@@ -51,73 +51,33 @@ class DocHandler(http.server.BaseHTTPRequestHandler):  # noqa
                 },
             )
 
-        rsc = None
-        if path_as_list and any(
-            (
-                path_as_list[-1].endswith('.ico'),
-                path_as_list[-1].endswith('.json'),
-                path_as_list[-1].endswith('.png'),
-                path_as_list[-1].endswith('.yaml'),
-                path_as_list[-1].startswith('docs'),
+        if (rsc := api.API.route_request(path_as_list)) is None:
+
+            docent.core.log.debug(
+                {
+                    'resource': 'DocHandler',
+                    'message': 'no paths matched',
+                    'path': parsed.path.strip('/'),
+                    'path_as_list': path_as_list,
+                    },
                 )
-            ):
-            rsc = objects.documentation.Swagger
-            path_parameters = {}
-        else:
-            for resource_meta in api.API.APPLICATION_RESOURCES:
-                if (
-                    resource_meta[0] == 'healthz'
-                    and not path_as_list
-                    ):
-                    path_trimmed = 'healthz'
-                elif len(path_as_list) > (
-                    len(s := resource_meta[0].split('/'))
-                    + len(resource_meta[1])
-                    + 1
-                    ):
-                    continue
-                elif len(path_as_list) < (
-                    len(s := resource_meta[0].split('/'))
-                    + len(resource_meta[1])
-                    ):
-                    continue
-                else:
-                    path_trimmed = '/'.join(
-                        [
-                            v
-                            for i, v
-                            in enumerate(path_as_list)
-                            if (
-                                i not in resource_meta[1]
-                                and i < len(s)
-                                )
-                            ]
-                        )
 
-                if resource_meta[0] == path_trimmed:
-                    rsc: resource.Resource = resource_meta[2]
-                    path_key = rsc.validate_path(path_as_list)
-                    path_obj = rsc.PATHS[
-                        '.'.join((rsc.__module__, rsc.__name__))
-                        ][path_key]
-                    path_ref_as_list = path_obj._name.split('/')
-                    path_parameters = {
-                        path_ref_as_list[i][1:-1]: v
-                        for i, v
-                        in enumerate(path_as_list)
-                        if (
-                            i in resource_meta[1]
-                            or (
-                                i >= len(resource_meta[0].split('/'))
-                                and path_key == 'ID'
-                                and self.command != 'POST'
-                                )
-                            )
-                        }
-                    break
-
-        if rsc is None:
             return
+        elif isinstance(rsc, objects.base.ComponentMeta):
+            path_key = rsc.validate_path(path_as_list)
+            path_obj = rsc.PATHS[rsc.resource_key][path_key]
+            path_ref_as_list = path_obj._name.split('/')
+            path_parameters = {
+                k[1:-1]: v
+                for i, v
+                in enumerate(path_as_list)
+                if (
+                    (k := path_ref_as_list[i]).startswith('{')
+                    and k.endswith('}')
+                    )
+                }
+        else:
+            path_parameters = {}
 
         query_parameters = {
             urllib.parse.unquote(s[0]): urllib.parse.unquote(s[1])

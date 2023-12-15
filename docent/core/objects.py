@@ -366,6 +366,11 @@ class DocObject(metaclass=types.DocMeta):
 
         return bool(self - self.__class__())
 
+    def __contains__(self, key: str) -> bool:
+        """Return True if key (or alias) is a field for the DocObject derivative."""  # noqa
+
+        return bool(self.__class__.key_for(key))
+
     def __getitem__(self, key: str) -> typing.Any:
         """Return field value dict style."""
 

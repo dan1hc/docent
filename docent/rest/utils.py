@@ -348,10 +348,12 @@ def spec_from_api(
     for (*_, resource) in api.APIMeta.APPLICATION_RESOURCES:
         if _verbose:
             docent.core.log.info(f'PARSING RESOURCE :: {resource.__name__}')
-        for path in resource.PATHS['.'.join((resource.__module__, resource.__name__))].values():  # noqa
+        for path in resource.PATHS[resource.resource_key].values():  # noqa
             if path:
                 if _verbose:
                     docent.core.log.info(path._name)
+                else:
+                    docent.core.log.debug(path._name)
                 _paths.update(path.as_component)
         desc = (
             (
@@ -502,35 +504,46 @@ def extract_path_parameters(path: str) -> dict[str, str]:  # noqa
     path_as_list = path.split('/')
     path_parameters = {}
 
+    affixes: list[str] = []
+    for (_, _, rsc) in api.APIMeta.APPLICATION_RESOURCES:
+        affixes.extend(rsc.PATH_PREFICES)
+        affixes.extend(rsc.PATH_SUFFICES)
+        affixes.append(rsc.__name__.lower())
+
     for resource_meta in api.APIMeta.APPLICATION_RESOURCES:
+        if (
+            resource_meta[0] == 'healthz'
+            and not path_as_list
+            ):
+            return resource_meta[2]
+
         path_trimmed = '/'.join(
             [
-                v
+                (
+                    resource_meta[0].split('/')[i]
+                    if (
+                        i in resource_meta[1]
+                        and v not in affixes
+                        )
+                    else v
+                    )
                 for i, v
                 in enumerate(path_as_list)
-                if (
-                    i not in resource_meta[1]
-                    and i <= len(resource_meta[0].split('/'))
-                    )
                 ]
             )
+
         if resource_meta[0] == path_trimmed:
             rsc: resource.Resource = resource_meta[2]
             path_key = rsc.validate_path(path_as_list)
-            path_obj = rsc.PATHS[
-                '.'.join((rsc.__module__, rsc.__name__))
-                ][path_key]
+            path_obj = rsc.PATHS[rsc.resource_key][path_key]
             path_ref_as_list = path_obj._name.split('/')
             path_parameters = {
-                path_ref_as_list[i][1:-1]: v
+                k[1:-1]: v
                 for i, v
                 in enumerate(path_as_list)
                 if (
-                    i in resource_meta[1]
-                    or (
-                        i == len(resource_meta[0].split('/')) + 1
-                        and path_key == 'ID'
-                        )
+                    (k := path_ref_as_list[i]).startswith('{')
+                    and k.endswith('}')
                     )
                 }
 

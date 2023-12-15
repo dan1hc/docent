@@ -12,7 +12,8 @@ class Constants(constants.PetsNameSpaceConstants):
     """Constant values specific only to the Pets resource."""
 
 
-@docent.rest.Route(
+@docent.rest.API(
+    request_headers=Constants.DEFAULT_REQUEST_HEADERS,
     include_enums_endpoint=True,
     )
 class Pets(docent.rest.Resource):

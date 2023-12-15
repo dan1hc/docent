@@ -10,9 +10,6 @@ class Constants(constants.PetsNameSpaceConstants):
 
 
 @resource.Pets.GET_ONE(
-    authorizers=Constants.DEFAULT_AUTHORIZERS,
-    request_headers=Constants.DEFAULT_REQUEST_HEADERS,
-    response_headers=Constants.DEFAULT_RESPONSE_HEADERS,
     errors=[
         FileNotFoundError,
         ]
@@ -39,11 +36,7 @@ def get_pet(
             )
 
 
-@resource.Pets.GET_MANY(
-    authorizers=Constants.DEFAULT_AUTHORIZERS,
-    request_headers=Constants.DEFAULT_REQUEST_HEADERS,
-    response_headers=Constants.DEFAULT_RESPONSE_HEADERS,
-    )
+@resource.Pets.GET_MANY
 def get_pets(
     request: docent.rest.Request  # The function should only ever take an docent.rest.Request
     ) -> list[docent.template.package.objects.Pet]:  # You MUST annotate the return signature.

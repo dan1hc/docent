@@ -1,9 +1,8 @@
 __all__ = (
-    'Route',
-    'RouteMeta',
+    'API',
+    'APIMeta',
     )
 
-import dataclasses
 import re
 import traceback
 import typing
@@ -23,7 +22,7 @@ from . import utils
 
 class Constants(constants.FrameworkConstants):  # noqa
 
-    BASE_RESPONSE_HEADERS: objects.response.Headers = (
+    DEFAULT_RESPONSE_HEADERS: objects.response.Headers = (
         objects.response.Headers.from_list(
             [
                 objects.response.Header(
@@ -41,10 +40,16 @@ class Constants(constants.FrameworkConstants):  # noqa
         )
 
 
-class RouteMeta(type):  # noqa
+class APIMeta(type):  # noqa
 
-    API: str = None
+    APPLICATION: str = None
     APPLICATION_RESOURCES: list[tuple[str, set[int], resource.Resource]] = []
+
+    AUTHORIZERS: list[objects.security.Authorizer] = []
+    INTEGRATIONS: list[objects.base.Component] = []
+    RESPONSE_HEADERS: objects.response.Headers = Constants.DEFAULT_RESPONSE_HEADERS  # noqa
+    REQUEST_HEADERS: objects.parameter.Parameters = objects.parameter.Parameters()  # noqa
+    ERRORS: list[Exception] = []
 
     def __wrapped_call__(
         cls,
@@ -52,6 +57,16 @@ class RouteMeta(type):  # noqa
         *args,
         **kwargs
         ) -> resource.Resource:
+
+        for ext in Constants.EXTENSIONS:
+            app_extension = getattr(cls, ext)
+            rsc_extension = getattr(rsc, ext)
+            if (extension := kwargs.get(ext.lower())):
+                extension += app_extension
+                extension += rsc_extension
+                setattr(rsc, ext, extension)
+            else:
+                setattr(rsc, ext, app_extension + rsc_extension)
 
         cls.APPLICATION_RESOURCES: list[tuple[str, set[int], resource.Resource]]  # noqa
         cls.APPLICATION_RESOURCES.append(
@@ -73,68 +88,25 @@ class RouteMeta(type):  # noqa
 
         if kwargs.get('include_enums_endpoint'):
 
-            @dataclasses.dataclass
-            class Enumeration(docent.core.objects.DocObject):
-                """Contains all documented object enums."""
-
-                name: str = dataclasses.field(
-                    default=None,
-                    metadata={
-                        'ignore': True,
-                        }
-                    )
-                values: list = dataclasses.field(
-                    default_factory=list,
-                    metadata={
-                        'ignore': True,
-                        }
-                    )
-
-            class Enums(resource.Resource):
-
-                PATH_PREFICES = [
-                    *rsc.PATH_PREFICES,
-                    rsc.__name__.lower()
-                    ]
-
-                @classmethod
-                @property
-                def resource(cls) -> Enumeration:  # noqa
-                    return Enumeration
-
-            @Enums.GET_MANY(
-                response_headers=Constants.BASE_RESPONSE_HEADERS,
-                )
-            def get_enums(
-                request: objects.Request
-                ) -> list[Enumeration]:
-                """Retrieve all enumerated field values for the resource."""
-
-                return [
-                    Enumeration(name=k, values=v)
-                    for k, v
-                    in rsc.resource.enumerations.items()
-                    ]
-
             cls.APPLICATION_RESOURCES.append(
                 (
                     re.sub(
                         Constants.PATH_ID_PARSE_EXPR,
                         '',
-                        Enums.path_schema
+                        rsc.as_enum.path_schema
                         ).strip('/'),
                     {
                         i
                         for i, v
-                        in enumerate(Enums.path_schema.split('/'))
+                        in enumerate(rsc.as_enum.path_schema.split('/'))
                         if v.startswith('{') and v.endswith('}')
                         },
-                    Enums
+                    rsc.as_enum
                     )
                 )
 
-        if not cls.API:
-            cls.API = rsc.__module__.split('.')[0]  # noqa
+        if not cls.APPLICATION:
+            cls.APPLICATION = rsc.__module__.split('.')[0]
 
         return rsc
 
@@ -156,7 +128,7 @@ class RouteMeta(type):  # noqa
     def __getitem__(
         cls,
         request: objects.Request
-        ) -> tuple[docent.core.objects.DocObject, int]:  # noqa
+        ) -> tuple[docent.core.objects.DocObject, int]:
 
         cls.route_request: typing.Callable[[list[str]], resource.Resource]
         cls.process_request: typing.Callable[
@@ -200,7 +172,7 @@ class RouteMeta(type):  # noqa
         return response, status_code
 
 
-class Route(metaclass=RouteMeta):
+class API(metaclass=APIMeta):
     """
     Primary resource registry for docent APIs.
 
@@ -216,7 +188,7 @@ class Route(metaclass=RouteMeta):
     ```py
     import docent.rest
 
-    @docent.rest.Route(
+    @docent.rest.API(
         include_enums_endpoint=True,
         )
     class Pets(docent.rest.Resource):  # noqa
@@ -225,7 +197,7 @@ class Route(metaclass=RouteMeta):
     ```
 
     #### Step 2
-    Then, use the Route object as follows when a request arrives \
+    Then, use the API object as follows when a request arrives \
     to actually process it:
 
     ```py
@@ -239,7 +211,7 @@ class Route(metaclass=RouteMeta):
         params={}
         )
 
-    response_obj, status_code = docent.rest.Route[request]
+    response_obj, status_code = docent.rest.API[request]
 
     ```
  
@@ -389,7 +361,7 @@ class Route(metaclass=RouteMeta):
                 data=utils.spec_from_api(
                     (
                         '',
-                        cls.API,
+                        cls.APPLICATION,
                         *cls.CONFIG
                         ),
                     commands.HELP_TEXT,
@@ -405,7 +377,7 @@ class Route(metaclass=RouteMeta):
                 data=utils.spec_from_api(
                     (
                         '',
-                        cls.API,
+                        cls.APPLICATION,
                         *cls.CONFIG
                         ),
                     commands.HELP_TEXT,
@@ -431,7 +403,7 @@ class Route(metaclass=RouteMeta):
             status_code = 200
         elif rsc.PATH_SUFFICES:
             response_obj = objects.documentation.SwaggerHTML(
-                title=docent.core.utils.to_camel_case(cls.API),
+                title=docent.core.utils.to_camel_case(cls.APPLICATION),
                 path='/' + '/'.join(
                     (
                         *rsc.PATH_SUFFICES,
@@ -442,7 +414,7 @@ class Route(metaclass=RouteMeta):
             status_code = 200
         else:
             response_obj = objects.documentation.SwaggerHTML(
-                title=docent.core.utils.to_camel_case(cls.API)
+                title=docent.core.utils.to_camel_case(cls.APPLICATION)
                 )
             status_code = 200
 

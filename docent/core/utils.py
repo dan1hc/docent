@@ -42,7 +42,7 @@ class Constants(constants.PackageConstants):  # noqa
             'ID': 'conn-string-password',
             'Severity': 'HIGH',
             'Title': 'Connection String Password',
-            'Regex': re.compile(r"""\w+(:[^:@]+)@"""),
+            'Regex': re.compile(r"""(:\/\/)+\w+(:[^:@]+)@"""),
             },
         {
             'ID': 'credit-card',

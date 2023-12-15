@@ -7,7 +7,7 @@ import dataclasses
 import docent.core
 
 from .. import resource
-from .. import route
+from .. import api
 
 from . import constants
 
@@ -17,7 +17,7 @@ class Constants(constants.HealthzNameSpaceConstants):
 
 
 @dataclasses.dataclass
-class HeartBeat(docent.core.DocObject):
+class HeartBeat(docent.core.objects.DocObject):
     """Default application heartbeat."""
 
     status: str = dataclasses.field(
@@ -28,7 +28,7 @@ class HeartBeat(docent.core.DocObject):
         )
 
 
-@route.Route
+@api.API
 class Healthz(resource.Resource):  # noqa
 
     @classmethod

@@ -43,7 +43,7 @@ from . import handler
 from . import healthz
 from . import objects
 from . import resource
-from . import route
+from . import api
 from . import utils
 
 from .objects import (
@@ -54,9 +54,9 @@ from .objects import (
 from .resource import (
     Resource,
     )
-from .route import (
-    Route,
-    RouteMeta,
+from .api import (
+    API,
+    APIMeta,
     )
 
 __version__ = docent.core.__version__

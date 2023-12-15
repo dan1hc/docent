@@ -10,9 +10,6 @@ class Constants(constants.PetsNameSpaceConstants):
 
 
 @resource.Pets.PUT_ONE(
-    authorizers=Constants.DEFAULT_AUTHORIZERS,
-    request_headers=Constants.DEFAULT_REQUEST_HEADERS,
-    response_headers=Constants.DEFAULT_RESPONSE_HEADERS,
     errors=[
         FileNotFoundError,
         ]
@@ -43,11 +40,7 @@ def update_pet(
             )
 
 
-@resource.Pets.PUT_MANY(
-    authorizers=Constants.DEFAULT_AUTHORIZERS,
-    request_headers=Constants.DEFAULT_REQUEST_HEADERS,
-    response_headers=Constants.DEFAULT_RESPONSE_HEADERS,
-    )
+@resource.Pets.PUT_MANY
 def update_pets(
     request: docent.rest.Request
     ) -> list[docent.template.package.objects.Pet]:

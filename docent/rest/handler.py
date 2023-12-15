@@ -7,7 +7,7 @@ import urllib.parse
 from . import constants
 from . import objects
 from . import resource
-from . import route
+from . import api
 
 
 class Constants(constants.FrameworkConstants):  # noqa
@@ -64,7 +64,7 @@ class DocHandler(http.server.BaseHTTPRequestHandler):  # noqa
             rsc = objects.documentation.Swagger
             path_parameters = {}
         else:
-            for resource_meta in route.Route.APPLICATION_RESOURCES:
+            for resource_meta in api.API.APPLICATION_RESOURCES:
                 if (
                     resource_meta[0] == 'healthz'
                     and not path_as_list
@@ -150,7 +150,7 @@ class DocHandler(http.server.BaseHTTPRequestHandler):  # noqa
 
     def do_DELETE(self):  # noqa
         if (request := self.get_request()):
-            response_obj, status_code = route.Route[request]
+            response_obj, status_code = api.API[request]
         else:
             err = (
                 objects
@@ -167,7 +167,7 @@ class DocHandler(http.server.BaseHTTPRequestHandler):  # noqa
 
     def do_GET(self):  # noqa
         if (request := self.get_request()):
-            response_obj, status_code = route.Route[request]
+            response_obj, status_code = api.API[request]
         else:
             err = (
                 objects
@@ -184,7 +184,7 @@ class DocHandler(http.server.BaseHTTPRequestHandler):  # noqa
 
     def do_OPTIONS(self):  # noqa
         if (request := self.get_request()):
-            response_obj, status_code = route.Route[request]
+            response_obj, status_code = api.API[request]
         else:
             err = (
                 objects
@@ -201,7 +201,7 @@ class DocHandler(http.server.BaseHTTPRequestHandler):  # noqa
 
     def do_PATCH(self):  # noqa
         if (request := self.get_request()):
-            response_obj, status_code = route.Route[request]
+            response_obj, status_code = api.API[request]
         else:
             err = (
                 objects
@@ -218,7 +218,7 @@ class DocHandler(http.server.BaseHTTPRequestHandler):  # noqa
 
     def do_POST(self):  # noqa
         if (request := self.get_request()):
-            response_obj, status_code = route.Route[request]
+            response_obj, status_code = api.API[request]
         else:
             err = (
                 objects
@@ -235,7 +235,7 @@ class DocHandler(http.server.BaseHTTPRequestHandler):  # noqa
 
     def do_PUT(self):  # noqa
         if (request := self.get_request()):
-            response_obj, status_code = route.Route[request]
+            response_obj, status_code = api.API[request]
         else:
             err = (
                 objects

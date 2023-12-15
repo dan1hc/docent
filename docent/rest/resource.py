@@ -4,9 +4,7 @@ __all__ = (
 
 import functools
 import re
-import traceback
 import typing
-import uuid
 
 import docent.core
 
@@ -14,11 +12,16 @@ from . import constants
 from . import enums
 from . import exceptions
 from . import objects
+from . import utils
 
 
 class Constants(constants.FrameworkConstants):  # noqa
 
-    pass
+    AUTHORIZERS: list[objects.security.Authorizer] = list
+    ERRORS: list[Exception]                        = list
+    INTEGRATIONS: list[objects.base.Component]     = list
+    REQUEST_HEADERS: objects.parameter.Parameters  = objects.parameter.Parameters  # noqa
+    RESPONSE_HEADERS: objects.response.Headers     = objects.response.Headers  # noqa
 
 
 def _prepare_method(
@@ -33,19 +36,44 @@ def _prepare_method(
             ]
         ],
     id_in_path: bool = True,
-    authorizers: list[objects.security.Authorizer] = None,
-    integrations: list[objects.base.Component] = None,
-    response_headers: objects.response.Headers = None,
-    request_headers: objects.parameter.Parameters = None,
-    errors: list[Exception] = None,
+    **kwargs,
     ):
+
+    extensions: dict[
+        str,
+        typing.Union[
+            list,
+            objects.response.Headers,
+            objects.parameter.Parameters
+            ]
+        ] = {
+            ext_lower: (
+                method_ext + rsc_extension
+                if (rsc_extension := getattr(cls, ext))
+                else method_ext
+                )
+            for ext
+            in Constants.EXTENSIONS
+            if (
+                method_ext := (
+                    kwargs[(ext_lower := ext.lower())]
+                    or getattr(Constants, ext)()
+                    )
+                ) is not None
+            }
+
+    authorizers: list[objects.security.Authorizer] = extensions['authorizers']
+    integrations: list[objects.base.Component] = extensions['integrations']
+    response_headers: objects.response.Headers = extensions['response_headers']  # noqa
+    request_headers: objects.parameter.Parameters = extensions['request_headers']  # noqa
+    errors: list[Exception] = extensions['errors']
 
     if 'return' not in event_handler_function.__annotations__:
         raise exceptions.InvalidReturnSignatureError(
             ' '.join(
                 (
                     f'Function {event_handler_function!s} missing',
-                    'return signature. Docent requires all functions',
+                    'return signature. docent requires all functions',
                     'decorated with a REST method to be annotated with a',
                     'return signature.'
                     )
@@ -73,15 +101,10 @@ def _prepare_method(
                 ) + f'\nCurrent value: {return_type!s}'
             )
 
-    path_obj = cls.PATHS[
-        '.'.join((cls.__module__, cls.__name__))
-        ][
-        'ID'
-        if id_in_path
-        else 'NO_ID'
-        ]
-
-    parameters = path_obj._path_parameters
+    path_obj = cls.PATHS[cls.resource_key]['ID' if id_in_path else 'NO_ID']
+    parameters = objects.parameter.Parameters.from_list(
+        path_obj._path_parameters._extensions
+        )
 
     if (
         method_name in {
@@ -100,7 +123,7 @@ def _prepare_method(
     success_response = objects.response.ResponseSpec.from_annotation(
         return_type,
         method_name,
-        cls.PATHS['.'.join((cls.__module__, cls.__name__))]['NO_ID']._name,
+        cls.PATHS[cls.resource_key]['NO_ID']._name,
         response_headers,
         )
     responses = objects.response.Responses(
@@ -114,7 +137,7 @@ def _prepare_method(
                     many=not id_in_path,
                     )
                 for exception
-                in (errors or [])
+                in errors
                 ],
             *[
                 objects.response.ResponseSpec.from_exception(
@@ -134,24 +157,16 @@ def _prepare_method(
         method_name=method_name,
         ) if method_name in {'post', 'put'} else None
 
-    resource_id = '_'.join(
-        (
-            docent.core.utils.camel_case_to_snake_case(
-                cls.resource.__name__.removesuffix('s')
-                ),
-            'id'
-            )
-        )
     path_ids = [
         path_parameter.name
         for path_parameter
         in path_obj._path_parameters
         if (
             (
-                path_parameter.name == resource_id
+                path_parameter.name == cls._resource_id
                 and id_in_path
                 )
-            or path_parameter.name != resource_id
+            or path_parameter.name != cls._resource_id
             )
         ]
 
@@ -161,7 +176,7 @@ def _prepare_method(
         method_name=method_name,
         many=not id_in_path,
         resource_id=(
-            resource_id
+            cls._resource_id
             if id_in_path
             else cls.resource_id
             ),
@@ -174,7 +189,7 @@ def _prepare_method(
         method_name=method_name,
         many=not id_in_path,
         resource_id=(
-            resource_id
+            cls._resource_id
             if id_in_path
             else cls.resource_id
             ),
@@ -190,13 +205,13 @@ def _prepare_method(
             security_=[
                 {auth._name: []}
                 for auth
-                in (authorizers or [])
+                in authorizers
                 ],
             tags=cls.tags or [],
             description=event_handler_function.__doc__,
             _name=method_name,
             _many=not id_in_path,
-            _extensions=integrations or [],
+            _extensions=integrations,
             _callable=event_handler_function,
             _response_headers=response_headers,
             _body_validator=body_validator,
@@ -215,20 +230,7 @@ def _prepare_method(
                             )
                         ),
                     description='Resource options response.',
-                    headers=response_headers or objects.response.Headers.from_list(
-                        [
-                            objects.response.Header(
-                                header.value,
-                                description=(
-                                    enums.header.DefaultHeaderValues[
-                                        header.name
-                                        ].value
-                                    )
-                                )
-                            for header
-                            in enums.header.DefaultHeaders
-                            ]
-                        ),
+                    headers=response_headers,
                     )
                 ]
             )
@@ -247,23 +249,7 @@ def _prepare_method(
             )
 
 
-class ResourceMeta(objects.base.ComponentMeta):  # noqa
-
-    def __getitem__(
-        cls,
-        request: 'objects.request.Request'
-        ) -> tuple[docent.core.objects.DocObject, int]:
-        return cls.process_request(request)
-
-    @classmethod
-    def process_request(
-        cls,
-        request: 'objects.request.Request'
-        ) -> tuple[docent.core.objects.DocObject, int]:  # noqa
-        ...
-
-
-class Resource(metaclass=ResourceMeta):  # noqa
+class Resource(metaclass=objects.base.ComponentMeta):  # noqa
     """
     A RESTful Resource.
 
@@ -301,7 +287,7 @@ class Resource(metaclass=ResourceMeta):  # noqa
     import docent.rest
 
 
-    @docent.rest.Route
+    @docent.rest.API
     class Campaigns(docent.rest.Resource):
         ...
 
@@ -331,12 +317,12 @@ class Resource(metaclass=ResourceMeta):  # noqa
     import docent.rest
 
 
-    @docent.rest.Route
+    @docent.rest.API
     class Campaigns(docent.rest.Resource):
         ...
 
 
-    @docent.rest.Route
+    @docent.rest.API
     class Placements(Campaigns):
         ...
 
@@ -359,7 +345,7 @@ class Resource(metaclass=ResourceMeta):  # noqa
     import docent.rest
 
 
-    @docent.rest.Route
+    @docent.rest.API
     class Campaigns(docent.rest.Resource):
         ...
 
@@ -390,7 +376,7 @@ class Resource(metaclass=ResourceMeta):  # noqa
         ...
 
 
-    @docent.rest.Route
+    @docent.rest.API
     class Campaigns(docent.rest.Resource):
         ...
 
@@ -411,7 +397,7 @@ class Resource(metaclass=ResourceMeta):  # noqa
     to automatically generate an error response with the correcr error \
     code and message for the situation.
 
-    * Additionally, Docent is built to convert builtin python exceptions \
+    * Additionally, docent is built to convert builtin python exceptions \
     into sensible HTTP counterparts.
         \
         * For example, `SyntaxError` can be raised to return a 400 error \
@@ -440,13 +426,13 @@ class Resource(metaclass=ResourceMeta):  # noqa
 
     * All resource names must end with the letter: 's'.
 
-    * Do not forget to decorate your resources with the Route class.
+    * Do not forget to decorate your resources with the API class.
 
     ```py
     import docent.rest
 
 
-    @docent.rest.Route
+    @docent.rest.API
     class Pets(docent.rest.Resource):
         ...
 
@@ -466,7 +452,7 @@ class Resource(metaclass=ResourceMeta):  # noqa
     class Campaign(docent.core.DocObject):
         ...
 
-    @docent.rest.Route
+    @docent.rest.API
     class Campaigns(docent.rest.Resource):
         ...
 
@@ -492,7 +478,7 @@ class Resource(metaclass=ResourceMeta):  # noqa
         ...
 
 
-    @docent.rest.Route
+    @docent.rest.API
     class Campaigns(docent.rest.Resource):
     
         @classmethod
@@ -508,6 +494,12 @@ class Resource(metaclass=ResourceMeta):  # noqa
 
     PATH_PREFICES: list[str] = []
     PATH_SUFFICES: list[str] = []
+
+    AUTHORIZERS: list[objects.security.Authorizer] = []
+    INTEGRATIONS: list[objects.base.Component] = []
+    RESPONSE_HEADERS: objects.response.Headers = objects.response.Headers()  # noqa
+    REQUEST_HEADERS: objects.parameter.Parameters = objects.parameter.Parameters()  # noqa
+    ERRORS: list[Exception] = []
 
     def __init_subclass__(cls):  # noqa
         if cls.__name__ == 'Healthz':
@@ -539,404 +531,466 @@ class Resource(metaclass=ResourceMeta):  # noqa
                     )
                 )
 
-        cls.PATHS.setdefault('.'.join((cls.__module__, cls.__name__)), {})
-        cls.PATHS[
-            '.'.join((cls.__module__, cls.__name__))
-            ]['NO_ID'] = objects.path.Path(
-                _name=cls.path_schema,
-                )
-        resource_id = '_'.join(
-            (
-                docent.core.utils.camel_case_to_snake_case(
-                    cls.resource.__name__.removesuffix('s')
-                    ),
-                'id'
-                )
+        cls.PATHS.setdefault(cls.resource_key, {})
+        cls.PATHS[cls.resource_key]['NO_ID'] = objects.path.Path(
+            _name=cls.path_schema,
             )
+
         path_schema_id = '/'.join(
             (
                 cls.path_schema,
-                '{' + resource_id + '}'
+                '{' + cls._resource_id + '}'
                 )
             )
-        cls.PATHS['.'.join((cls.__module__, cls.__name__))]['ID'] = (
-            objects.path.Path(_name=path_schema_id)
+
+        cls.PATHS[cls.resource_key]['ID'] = (
+            objects.
+            path.
+            Path(_name=path_schema_id)
             )
 
         return super().__init_subclass__()
 
-    def __getitem__(
-        self,
-        request: 'objects.request.Request'
-        ) -> tuple[docent.core.objects.DocObject, int]:  # noqa
-        return self.__class__[request]
+    @classmethod
+    def _register_method(
+        cls,
+        event_handler_function: typing.Callable[
+            ['objects.request.Request'],
+            None
+            ],
+        method_name: str,
+        id_in_path: bool,
+        *args,
+        **kwargs
+        ) -> typing.Callable:
+
+        _prepare_method(
+            cls,
+            method_name,
+            event_handler_function,
+            id_in_path=id_in_path,
+            authorizers=kwargs.get('authorizers'),
+            integrations=kwargs.get('integrations'),
+            response_headers=kwargs.get('response_headers'),
+            request_headers=kwargs.get('request_headers'),
+            errors=kwargs.get('errors'),
+            )
+
+        return event_handler_function
 
     @classmethod
     def DELETE_MANY(
         cls,
-        authorizers: list[objects.security.Authorizer] = None,
-        integrations: list[objects.base.Component] = None,
-        response_headers: objects.response.Headers = None,
-        request_headers: objects.parameter.Parameters = None,
-        errors: list[Exception] = None,
+        *args,
+        **kwargs,
         ) -> typing.Callable:  # noqa
 
-        def _wrapper(
-            event_handler_function: typing.Callable[
-                ['objects.request.Request'],
-                None
-                ],
-            ) -> 'Resource':
+        method_name: str = 'delete'
+        id_in_path: bool = False
 
-            _prepare_method(
-                cls,
-                'delete',
+        if args:
+            event_handler_function, *args = args
+            return cls._register_method(
                 event_handler_function,
-                id_in_path=False,
-                authorizers=authorizers,
-                integrations=integrations,
-                response_headers=response_headers,
-                request_headers=request_headers,
-                errors=errors,
+                method_name,
+                id_in_path,
+                *args,
+                **kwargs
                 )
-
-            return event_handler_function
-
-        return _wrapper
+        else:
+            def _wrapper(
+                event_handler_function: typing.Callable[
+                    ['objects.request.Request'],
+                    None
+                    ],
+                *args,
+                **kwargs
+                ) -> typing.Callable:
+                return cls._register_method(
+                    event_handler_function,
+                    method_name,
+                    id_in_path,
+                    *args,
+                    **kwargs
+                    )
+            return _wrapper
 
     @classmethod
     def DELETE_ONE(
         cls,
-        authorizers: list[objects.security.Authorizer] = None,
-        integrations: list[objects.base.Component] = None,
-        response_headers: objects.response.Headers = None,
-        request_headers: objects.parameter.Parameters = None,
-        errors: list[Exception] = None,
+        *args,
+        **kwargs,
         ) -> typing.Callable:  # noqa
 
-        def _wrapper(
-            event_handler_function: typing.Callable[
-                ['objects.request.Request'],
-                None
-                ],
-            ) -> 'Resource':
+        method_name: str = 'delete'
+        id_in_path: bool = True
 
-            _prepare_method(
-                cls,
-                'delete',
+        if args:
+            event_handler_function, *args = args
+            return cls._register_method(
                 event_handler_function,
-                id_in_path=True,
-                authorizers=authorizers,
-                integrations=integrations,
-                response_headers=response_headers,
-                request_headers=request_headers,
-                errors=errors,
+                method_name,
+                id_in_path,
+                *args,
+                **kwargs
                 )
-
-            return event_handler_function
-
-        return _wrapper
+        else:
+            def _wrapper(
+                event_handler_function: typing.Callable[
+                    ['objects.request.Request'],
+                    None
+                    ],
+                *args,
+                **kwargs
+                ) -> typing.Callable:
+                return cls._register_method(
+                    event_handler_function,
+                    method_name,
+                    id_in_path,
+                    *args,
+                    **kwargs
+                    )
+            return _wrapper
 
     @classmethod
     def GET_MANY(
         cls,
-        authorizers: list[objects.security.Authorizer] = None,
-        integrations: list[objects.base.Component] = None,
-        response_headers: objects.response.Headers = None,
-        request_headers: objects.parameter.Parameters = None,
-        errors: list[Exception] = None,
+        *args,
+        **kwargs,
         ) -> typing.Callable:  # noqa
 
-        def _wrapper(
-            event_handler_function: typing.Callable[
-                ['objects.request.Request'],
-                list[docent.core.objects.DocObject]
-                ],
-            ) -> 'Resource':
+        method_name: str = 'get'
+        id_in_path: bool = False
 
-            _prepare_method(
-                cls,
-                'get',
+        if args:
+            event_handler_function, *args = args
+            return cls._register_method(
                 event_handler_function,
-                id_in_path=False,
-                authorizers=authorizers,
-                integrations=integrations,
-                response_headers=response_headers,
-                request_headers=request_headers,
-                errors=errors,
+                method_name,
+                id_in_path,
+                *args,
+                **kwargs
                 )
-
-            return event_handler_function
-
-        return _wrapper
+        else:
+            def _wrapper(
+                event_handler_function: typing.Callable[
+                    ['objects.request.Request'],
+                    None
+                    ],
+                *args,
+                **kwargs
+                ) -> typing.Callable:
+                return cls._register_method(
+                    event_handler_function,
+                    method_name,
+                    id_in_path,
+                    *args,
+                    **kwargs
+                    )
+            return _wrapper
 
     @classmethod
     def GET_ONE(
         cls,
-        authorizers: list[objects.security.Authorizer] = None,
-        integrations: list[objects.base.Component] = None,
-        response_headers: objects.response.Headers = None,
-        request_headers: objects.parameter.Parameters = None,
-        errors: list[Exception] = None,
+        *args,
+        **kwargs,
         ) -> typing.Callable:  # noqa
 
-        def _wrapper(
-            event_handler_function: typing.Callable[
-                ['objects.request.Request'],
-                docent.core.objects.DocObject
-                ],
-            ) -> 'Resource':
+        method_name: str = 'get'
+        id_in_path: bool = True
 
-            _prepare_method(
-                cls,
-                'get',
+        if args:
+            event_handler_function, *args = args
+            return cls._register_method(
                 event_handler_function,
-                id_in_path=True,
-                authorizers=authorizers,
-                integrations=integrations,
-                response_headers=response_headers,
-                request_headers=request_headers,
-                errors=errors,
+                method_name,
+                id_in_path,
+                *args,
+                **kwargs
                 )
-
-            return event_handler_function
-
-        return _wrapper
+        else:
+            def _wrapper(
+                event_handler_function: typing.Callable[
+                    ['objects.request.Request'],
+                    None
+                    ],
+                *args,
+                **kwargs
+                ) -> typing.Callable:
+                return cls._register_method(
+                    event_handler_function,
+                    method_name,
+                    id_in_path,
+                    *args,
+                    **kwargs
+                    )
+            return _wrapper
 
     @classmethod
     def PATCH_ONE(
         cls,
-        authorizers: list[objects.security.Authorizer] = None,
-        integrations: list[objects.base.Component] = None,
-        response_headers: objects.response.Headers = None,
-        request_headers: objects.parameter.Parameters = None,
-        errors: list[Exception] = None,
+        *args,
+        **kwargs,
         ) -> typing.Callable:  # noqa
 
-        def _wrapper(
-            event_handler_function: typing.Callable[
-                ['objects.request.Request'],
-                docent.core.objects.DocObject
-                ],
-            ) -> 'Resource':
+        method_name: str = 'patch'
+        id_in_path: bool = True
 
-            _prepare_method(
-                cls,
-                'patch',
+        if args:
+            event_handler_function, *args = args
+            return cls._register_method(
                 event_handler_function,
-                id_in_path=True,
-                authorizers=authorizers,
-                integrations=integrations,
-                response_headers=response_headers,
-                request_headers=request_headers,
-                errors=errors,
+                method_name,
+                id_in_path,
+                *args,
+                **kwargs
                 )
-
-            return event_handler_function
-
-        return _wrapper
+        else:
+            def _wrapper(
+                event_handler_function: typing.Callable[
+                    ['objects.request.Request'],
+                    None
+                    ],
+                *args,
+                **kwargs
+                ) -> typing.Callable:
+                return cls._register_method(
+                    event_handler_function,
+                    method_name,
+                    id_in_path,
+                    *args,
+                    **kwargs
+                    )
+            return _wrapper
 
     @classmethod
     def POST_MANY(
         cls,
-        authorizers: list[objects.security.Authorizer] = None,
-        integrations: list[objects.base.Component] = None,
-        response_headers: objects.response.Headers = None,
-        request_headers: objects.parameter.Parameters = None,
-        errors: list[Exception] = None,
+        *args,
+        **kwargs,
         ) -> typing.Callable:  # noqa
 
-        def _wrapper(
-            event_handler_function: typing.Callable[
-                ['objects.request.Request'],
-                list[docent.core.objects.DocObject]
-                ],
-            ) -> 'Resource':
+        method_name: str = 'post'
+        id_in_path: bool = False
 
-            _prepare_method(
-                cls,
-                'post',
+        if args:
+            event_handler_function, *args = args
+            return cls._register_method(
                 event_handler_function,
-                id_in_path=False,
-                authorizers=authorizers,
-                integrations=integrations,
-                response_headers=response_headers,
-                request_headers=request_headers,
-                errors=errors,
+                method_name,
+                id_in_path,
+                *args,
+                **kwargs
                 )
-
-            return event_handler_function
-
-        return _wrapper
+        else:
+            def _wrapper(
+                event_handler_function: typing.Callable[
+                    ['objects.request.Request'],
+                    None
+                    ],
+                *args,
+                **kwargs
+                ) -> typing.Callable:
+                return cls._register_method(
+                    event_handler_function,
+                    method_name,
+                    id_in_path,
+                    *args,
+                    **kwargs
+                    )
+            return _wrapper
 
     @classmethod
     def PUT_MANY(
         cls,
-        authorizers: list[objects.security.Authorizer] = None,
-        integrations: list[objects.base.Component] = None,
-        response_headers: objects.response.Headers = None,
-        request_headers: objects.parameter.Parameters = None,
-        errors: list[Exception] = None,
+        *args,
+        **kwargs,
         ) -> typing.Callable:  # noqa
 
-        def _wrapper(
-            event_handler_function: typing.Callable[
-                ['objects.request.Request'],
-                list[docent.core.objects.DocObject]
-                ],
-            ) -> 'Resource':
+        method_name: str = 'put'
+        id_in_path: bool = False
 
-            _prepare_method(
-                cls,
-                'put',
+        if args:
+            event_handler_function, *args = args
+            return cls._register_method(
                 event_handler_function,
-                id_in_path=False,
-                authorizers=authorizers,
-                integrations=integrations,
-                response_headers=response_headers,
-                request_headers=request_headers,
-                errors=errors,
+                method_name,
+                id_in_path,
+                *args,
+                **kwargs
                 )
-
-            return event_handler_function
-
-        return _wrapper
+        else:
+            def _wrapper(
+                event_handler_function: typing.Callable[
+                    ['objects.request.Request'],
+                    None
+                    ],
+                *args,
+                **kwargs
+                ) -> typing.Callable:
+                return cls._register_method(
+                    event_handler_function,
+                    method_name,
+                    id_in_path,
+                    *args,
+                    **kwargs
+                    )
+            return _wrapper
 
     @classmethod
     def PUT_ONE(
         cls,
-        authorizers: list[objects.security.Authorizer] = None,
-        integrations: list[objects.base.Component] = None,
-        response_headers: objects.response.Headers = None,
-        request_headers: objects.parameter.Parameters = None,
-        errors: list[Exception] = None,
+        *args,
+        **kwargs,
         ) -> typing.Callable:  # noqa
 
-        def _wrapper(
-            event_handler_function: typing.Callable[
-                ['objects.request.Request'],
-                docent.core.objects.DocObject
-                ],
-            ) -> 'Resource':
+        method_name: str = 'put'
+        id_in_path: bool = True
 
-            _prepare_method(
-                cls,
-                'put',
+        if args:
+            event_handler_function, *args = args
+            return cls._register_method(
                 event_handler_function,
-                id_in_path=True,
-                authorizers=authorizers,
-                integrations=integrations,
-                response_headers=response_headers,
-                request_headers=request_headers,
-                errors=errors,
+                method_name,
+                id_in_path,
+                *args,
+                **kwargs
                 )
-
-            return event_handler_function
-
-        return _wrapper
+        else:
+            def _wrapper(
+                event_handler_function: typing.Callable[
+                    ['objects.request.Request'],
+                    None
+                    ],
+                *args,
+                **kwargs
+                ) -> typing.Callable:
+                return cls._register_method(
+                    event_handler_function,
+                    method_name,
+                    id_in_path,
+                    *args,
+                    **kwargs
+                    )
+            return _wrapper
 
     @classmethod
-    def process_request(
+    def apply_authorizers(
         cls,
-        request: 'objects.request.Request'
-        ) -> tuple[docent.core.objects.DocObject, int]:  # noqa
-        try:
-            request_id = uuid.uuid4().hex
-            docent.core.log.info(
-                {
-                    'request_id': request_id,
-                    'resource': cls.__name__,
-                    'message': 'validating request',
-                    'request': request,
-                    }
-                )
+        authorizers: list[objects.security.Authorizer]
+        ):
+        """Apply authorizer to all resource methods."""
 
-            if request.method.lower() == 'post':
-                path_key = 'NO_ID'
-            else:
-                path_key = cls.validate_path(request.path_as_list)
+        security = [
+            {auth._name: []}
+            for auth
+            in (authorizers or [])
+            ]
 
-            path_obj = cls.PATHS[
-                '.'.join((cls.__module__, cls.__name__))
-                ][path_key]
-            path_obj.validate_method(request.method, request.path)
+        method_obj: objects.method.Method
+        for method_obj in cls.methods:
+            for authorizer in security:
+                if (
+                    method_obj.security_
+                    and authorizer not in method_obj.security_
+                    ):
+                    method_obj.security_.append(authorizer)
+                elif not method_obj.security_:
+                    method_obj.security_ = [authorizer]
 
-            method_obj: objects.method.Method = getattr(
-                path_obj,
-                request.method.lower()
-                )
+    @classmethod
+    def apply_integrations(
+        cls,
+        integrations: list[objects.base.Component]
+        ):
+        """Apply integrations to all resource methods."""
 
-            parameters = {}
+        method_obj: objects.method.Method
+        for method_obj in cls.methods:
+            for integration in integrations:
+                if integration not in method_obj:
+                    method_obj._extensions.append(integration)
 
-            if request.headers:
-                parameters.update(request.headers)
-            if request.params:
-                parameters.update(request.params)
+    @classmethod
+    def apply_request_headers(
+        cls,
+        request_headers: objects.parameter.Parameters
+        ):
+        """Apply request headers to all resource methods."""
 
-            if parameters:
-                method_obj.validate_against_schema('parameters', parameters)
-            if request.body:
-                method_obj.validate_against_schema('body', request.body)
-
-            (
-                request_body,
-                request_params
-                ) = method_obj.parse_request_dtypes(
-                    request.body,
-                    request.params
+        method_obj: objects.method.Method
+        for method_obj in cls.methods:
+            if (
+                method_obj.parameters
+                and isinstance(method_obj.parameters, list)
+                ):
+                refs: set[str] = {d['$ref'] for d in method_obj.parameters}
+                for param_ref in request_headers.as_reference:
+                    if param_ref['$ref'] not in refs:
+                        method_obj.parameters.append(param_ref)
+                method_obj.parameters = sorted(
+                    method_obj.parameters,
+                    key=utils.sort_on_last_field
                     )
-            request.body = request_body
-            request.params = request_params
-            docent.core.log.info(
-                {
-                    'request_id': request_id,
-                    'resource': cls.__name__,
-                    'message': 'processing validated request',
-                    'request': request
-                    }
-                )
-            response_obj = method_obj(request)
-            status_code = Constants.METHOD_SUCCESS_CODES.get(
-                request.method.lower(),
-                200
-                )
-            docent.core.log.info(
-                {
-                    'request_id': request_id,
-                    'resource': cls.__name__,
-                    'message': 'request processed successfully',
-                    'status_code': str(status_code),
-                    'response': response_obj,
-                    },
-                )
-        except Exception as exception:
-            api_module = cls.__module__.split('.')[0]
-            most_recent_trace = traceback.format_tb(
-                exception.__traceback__
-                )[-1]
-            if len(spl := most_recent_trace.strip().split(', ')) != 3:
-                is_error_raised = False
-            else:
-                file_name, _, trace = spl
-                is_error_raised = ' raise ' in trace
-                is_error_from_api = api_module in file_name
-            if is_error_raised or is_error_from_api:
-                response_obj = objects.response.Error.from_exception(exception)
-            else:
-                response_obj = objects.response.Error.from_exception(
-                    exceptions.UnexpectedError
+            elif (
+                method_obj.parameters
+                and isinstance(
+                    method_obj.parameters,
+                    objects.parameter.Parameters
                     )
-            status_code = response_obj.errorCode
-            docent.core.log.error(
-                {
-                    'request_id': request_id,
-                    'resource': cls.__name__,
-                    'message': 'error processing request',
-                    'status_code': str(status_code),
-                    'response': response_obj,
-                    },
-                )
-        return response_obj, status_code
+                ):
+                method_obj.parameters += request_headers
+                method_obj.parameters = sorted(
+                    method_obj.parameters.as_reference,
+                    key=utils.sort_on_last_field
+                    )
+            else:
+                method_obj.parameters = sorted(
+                    request_headers.as_reference,
+                    key=utils.sort_on_last_field
+                    )
+
+    @classmethod
+    def apply_response_headers(
+        cls,
+        response_headers: objects.response.Headers
+        ):
+        """Apply response headers to all resource methods."""
+
+        method_obj: objects.method.Method
+        for method_obj in cls.methods:
+            if method_obj._response_headers:
+                method_obj._response_headers += response_headers
+            else:
+                method_obj._response_headers = response_headers
+
+    @classmethod
+    def apply_errors(
+        cls,
+        errors: list[Exception]
+        ):
+        """Apply error responses to all resource methods."""
+
+        for with_id, path_obj in cls.PATHS[cls.resource_key].items():
+            for method_name in {'delete', 'get', 'patch', 'post', 'put'}:
+                if (method_obj := getattr(path_obj, method_name)) is not None:
+                    method_obj: objects.method.Method
+                    error_responses = objects.response.Responses(
+                        _extensions=[
+                            objects.response.ResponseSpec.from_exception(
+                                exception,
+                                method_name,
+                                path_obj._name,
+                                many=with_id == 'NO_ID',
+                                )
+                            for exception
+                            in errors
+                            ]
+                        )
+                    if method_obj.responses:
+                        method_obj.responses += error_responses
+                    else:
+                        method_obj.responses = error_responses
 
     @classmethod
     def validate_path(
@@ -990,6 +1044,21 @@ class Resource(metaclass=ResourceMeta):  # noqa
     @classmethod
     @property
     @functools.lru_cache(maxsize=1)
+    def _resource_id(cls) -> str:
+        return '_'.join(
+            (
+                singular.removesuffix('ie') + 'y' if (
+                    singular := docent.core.utils.camel_case_to_snake_case(
+                        cls.__name__.removesuffix('s')
+                        )
+                    ).endswith('ie') else singular,
+                'id'
+                )
+            )
+
+    @classmethod
+    @property
+    @functools.lru_cache(maxsize=1)
     def resource_id(cls) -> str:
         """
         Unique ID field name for the resource.
@@ -1000,34 +1069,19 @@ class Resource(metaclass=ResourceMeta):  # noqa
         in 'id' or 'id_' (case insensitive).
         """
 
+        cls.resource: docent.core.objects.DocObject
         if (
             cls.resource.reference
             == 'docent-rest-healthz-resource-heartBeat'
             ):
             return 'healthz_id'
         elif (
-            (
-                k := '_'.join(
-                    (
-                        singular.removesuffix('ie') + 'y' if (
-                            singular := docent.core.utils.camel_case_to_snake_case(
-                                cls.__name__.removesuffix('s')
-                                )
-                            ).endswith('ie') else singular,
-                        'id'
-                        )
-                    )
-                )
-            and (
-                (_k := k.strip('_')) in cls.resource.fields
-                or ('_' + _k) in cls.resource.fields
-                or (_k + '_') in cls.resource.fields
-                or ('_' + _k + '_') in cls.resource.fields
-                )
+            (k := cls._resource_id)
+            and k in cls.resource
             ):
             return k
-        else:
-            return sorted(
+        elif (
+            ordering := sorted(
                 (
                     f
                     for f
@@ -1035,7 +1089,17 @@ class Resource(metaclass=ResourceMeta):  # noqa
                     if f.strip('_').lower().endswith('id')
                     ),
                 key=lambda k: len(k)
-                )[0]
+                )
+            ):
+            return ordering[0]
+        else:
+            return k
+
+    @classmethod
+    @property
+    @functools.lru_cache(maxsize=1)
+    def resource_key(cls) -> str:  # noqa
+        return '.'.join((cls.__module__, cls.__name__))
 
     @classmethod
     @property
@@ -1099,3 +1163,50 @@ class Resource(metaclass=ResourceMeta):  # noqa
                     ]
                 )
             ]
+
+    @classmethod
+    @property
+    def methods(cls) -> typing.Iterator[objects.method.Method]:
+        """Yield all methods for resource."""
+
+        for path_obj in cls.PATHS[cls.resource_key].values():
+            for method_name in {'delete', 'get', 'patch', 'post', 'put'}:
+                if (method_obj := getattr(path_obj, method_name)) is not None:
+                    yield method_obj
+
+    @classmethod
+    @property
+    @functools.lru_cache(maxsize=1)
+    def as_enum(cls) -> 'Resource':
+        """Return an Enumeration resource for the managed object."""
+
+        class Enums(Resource):  # noqa
+
+            PATH_PREFICES = [
+                *cls.PATH_PREFICES,
+                cls.__name__.lower()
+                ]
+
+            @classmethod
+            @property
+            def resource(cls) -> objects.enumeration.Enumeration:  # noqa
+                return objects.enumeration.Enumeration
+
+        for ext in Constants.EXTENSIONS:
+            extension = getattr(Enums, ext)
+            extension += getattr(cls, ext)
+            setattr(Enums, ext, extension)
+
+        @Enums.GET_MANY
+        def get_enums(
+            request: objects.Request
+            ) -> list[objects.enumeration.Enumeration]:
+            """Retrieve all enumerated field values for the object."""
+
+            return [
+                objects.enumeration.Enumeration(name=k, values=v)
+                for k, v
+                in cls.resource.enumerations.items()
+                ]
+
+        return Enums

@@ -64,7 +64,7 @@ class Parameters(base.Component):  # noqa
             (
                 component.as_reference
                 for component
-                in self._extensions
+                in self
                 ),
             key=utils.sort_on_last_field
             )

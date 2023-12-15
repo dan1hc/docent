@@ -12,9 +12,6 @@ class Constants(constants.PetsNameSpaceConstants):
 
 
 @resource.Pets.PATCH_ONE(
-    authorizers=Constants.DEFAULT_AUTHORIZERS,
-    request_headers=Constants.DEFAULT_REQUEST_HEADERS,
-    response_headers=Constants.DEFAULT_RESPONSE_HEADERS,
     errors=[
         FileNotFoundError,
         ]

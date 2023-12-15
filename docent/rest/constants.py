@@ -47,6 +47,13 @@ class FrameworkConstants(docent.core.Constants):  # noqa
         PermissionError: exceptions.NotAuthorizedError.__doc__,
         SyntaxError: exceptions.RequestError.__doc__,
         }
+    EXTENSIONS: set[str]                                     = {
+        'AUTHORIZERS',
+        'INTEGRATIONS',
+        'RESPONSE_HEADERS',
+        'REQUEST_HEADERS',
+        'ERRORS',
+        }
     FIELD_DELIM                                              = '.'
     TAG_DELIM                                                = ':'
     METHOD_SUCCESS_CODES: dict[str, int]                     = {

@@ -36,7 +36,6 @@ class Component(metaclass=ComponentMeta):  # noqa
 
     def __init_subclass__(cls) -> None:
 
-
         def __hash__(cls) -> int:
             return int(
                 hashlib.sha1(
@@ -48,14 +47,11 @@ class Component(metaclass=ComponentMeta):  # noqa
                 base=16
                 )
 
-
         if not hasattr(cls, '__hash__') or cls.__hash__ is None:
             cls.__hash__ = __hash__
 
-
         def __repr__(cls) -> str:
             return cls.as_json
-
 
         cls.__repr__ = __repr__
 
@@ -97,8 +93,14 @@ class Component(metaclass=ComponentMeta):  # noqa
                 if k in self.__dataclass_fields__
                 },
             )
-        extended._extensions = list(set(self._extensions + other._extensions))
+        for extension in other:
+            if extension not in extended:
+                extended._extensions.append(extension)
+
         return extended
+
+    def __contains__(self, item: 'Component') -> bool:
+        return item in self._extensions
 
     def __lt__(self, other: 'Component') -> bool:
         if self._name and other._name:
@@ -123,8 +125,12 @@ class Component(metaclass=ComponentMeta):  # noqa
     def __bool__(self) -> bool:
         return bool(self._extensions)
 
-    def __iadd__(self, other: 'Component'):
-        return self + other
+    def __iadd__(self, other: 'Component') -> 'Component':
+        for extension in other:
+            if extension not in self:
+                self._extensions.append(extension)
+
+        return self
 
     def __iter__(self) -> typing.Iterator['Component']:
         for component in self._extensions:

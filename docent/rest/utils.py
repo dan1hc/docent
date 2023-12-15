@@ -229,7 +229,7 @@ def spec_from_api(
     api = importlib.import_module(args[1])
 
     from . import objects
-    from . import route
+    from . import api
 
     is_aws_lambda = '--aws-lambda' in args
     is_aws_api_gateway = '--aws-api-gateway' in args
@@ -345,7 +345,7 @@ def spec_from_api(
     tags: list[dict] = []
     _paths: dict[str, dict] = {}
     _verbose = '--verbose' in args or '-v' in args
-    for (*_, resource) in route.RouteMeta.APPLICATION_RESOURCES:
+    for (*_, resource) in api.APIMeta.APPLICATION_RESOURCES:
         if _verbose:
             docent.core.log.info(f'PARSING RESOURCE :: {resource.__name__}')
         for path in resource.PATHS['.'.join((resource.__module__, resource.__name__))].values():  # noqa
@@ -486,20 +486,23 @@ def sort_on_last_field(k: typing.Union[str, dict]) -> str:  # noqa
         k = k.get('$ref')
     if not k:
         return 'Z'
-    return k.split(
-        Constants.DOC_DELIM
-        )[-1].split(Constants.FIELD_DELIM)[-1]
+    elif isinstance(k, str):
+        return k.split(
+            Constants.DOC_DELIM
+            )[-1].split(Constants.FIELD_DELIM)[-1]
+    else:
+        return str(k)
 
 
 def extract_path_parameters(path: str) -> dict[str, str]:  # noqa
 
     from . import resource
-    from . import route
+    from . import api
 
     path_as_list = path.split('/')
     path_parameters = {}
 
-    for resource_meta in route.RouteMeta.APPLICATION_RESOURCES:
+    for resource_meta in api.APIMeta.APPLICATION_RESOURCES:
         path_trimmed = '/'.join(
             [
                 v

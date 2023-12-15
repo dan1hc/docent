@@ -5,6 +5,7 @@ __all__ = (
 
 import abc
 import dataclasses
+import enum
 import functools
 import json
 import re
@@ -24,7 +25,7 @@ class Constants(constants.PackageConstants):  # noqa
 @dataclasses.dataclass
 class DocObject(metaclass=types.DocMeta):
     """
-    Base Docent Object.
+    Base docent Object.
 
     ---
 
@@ -68,7 +69,7 @@ class DocObject(metaclass=types.DocMeta):
         \"""A pet.\"""
 
         id_: str = None  # Trailing underscores are special
-                         # in Docent, check the documentation
+                         # in docent, check the documentation
                          # below for more detail.
         name: str = None
         type: str = None
@@ -275,6 +276,25 @@ class DocObject(metaclass=types.DocMeta):
     Returns a dictionary with {fieldName: fieldValue2} for \
     any fields that differ between the two DocObjects.
 
+    ```py
+    value = DocObject['field']
+    ```
+
+    Get value for DocObject field.
+
+    ```py
+    DocObject['field'] = value
+    ```
+
+    Set value for DocObject field.
+
+    ```py
+    field in DocObject
+    ```
+
+    Returns True if any one of field, _field, field_, or _field_
+    is a valid field for the DocObject, otherwise False.
+
     """
 
     def __init_subclass__(cls):
@@ -329,9 +349,9 @@ class DocObject(metaclass=types.DocMeta):
             ):
             cls.APPLICATION_OBJECTS.setdefault(cls.reference, cls)
 
-        def __repr__(cls) -> str:
+        def __repr__(self) -> str:
             return json.dumps(
-                cls.as_rest,
+                self.as_rest,
                 default=utils.prefix_value_to_string,
                 indent=Constants.INDENT,
                 sort_keys=True
@@ -346,13 +366,29 @@ class DocObject(metaclass=types.DocMeta):
 
         return bool(self - self.__class__())
 
+    def __getitem__(self, key: str) -> typing.Any:
+        """Return field value dict style."""
+
+        if (k := self.__class__.key_for(key)):
+            return self.__dict__[k]
+        else:
+            raise KeyError(key)
+
+    def __setitem__(self, key: str, value: typing.Any):
+        """Set field value dict style."""
+
+        if (k := self.__class__.key_for(key)):
+            setattr(self, k, value)
+        else:
+            raise KeyError(key)
+
     def __sub__(self, other: 'DocObject') -> dict[str, typing.Any]:
         """Calculate diff between same object types."""
 
         diff = {}
         for field in self.fields:
-            value = getattr(self, field)
-            other_value = getattr(other, field)
+            value = self[field]
+            other_value = other[field]
             if (
                 isinstance(value, DocObject)
                 and isinstance(other_value, DocObject)
@@ -368,8 +404,8 @@ class DocObject(metaclass=types.DocMeta):
 
         obj = other.__class__()
         for field, field_meta in self.fields.items():
-            value = getattr(self, field)
-            other_value = getattr(other, field)
+            value = self[field]
+            other_value = other[field]
             if isinstance(
                 field_meta.default_factory,
                 dataclasses._MISSING_TYPE
@@ -378,11 +414,11 @@ class DocObject(metaclass=types.DocMeta):
             else:
                 default_value = field_meta.default_factory()
             if value != default_value:
-                setattr(obj, field, value)
+                obj[field] = value
             elif other_value != default_value:
-                setattr(obj, field, other_value)
+                obj[field] = other_value
             else:
-                setattr(obj, field, value)
+                obj[field] = value
         return obj
 
     def __rshift__(self, other: 'DocObject') -> 'DocObject':
@@ -390,8 +426,8 @@ class DocObject(metaclass=types.DocMeta):
 
         obj = other.__class__()
         for field, field_meta in self.fields.items():
-            value = getattr(self, field)
-            other_value = getattr(other, field)
+            value = self[field]
+            other_value = other[field]
             if isinstance(
                 field_meta.default_factory,
                 dataclasses._MISSING_TYPE
@@ -400,9 +436,9 @@ class DocObject(metaclass=types.DocMeta):
             else:
                 default_value = field_meta.default_factory()
             if other_value != default_value:
-                setattr(obj, field, other_value)
+                obj[field] = other_value
             else:
-                setattr(obj, field, value)
+                obj[field] = value
         return obj
 
     def _to_dbo(
@@ -524,52 +560,8 @@ class DocObject(metaclass=types.DocMeta):
                     rest_obj
                     )
                 )
-        if cls.isCamelCase:
-            return cls.from_dict(
-                {
-                    k: v
-                    for _k, v
-                    in rest_obj.items()
-                    if (
-                        (
-                            (k := _k) in cls.fields
-                            or (k := k + '_') in cls.fields
-                            )
-                        or (
-                            _k.lower().endswith('id')
-                            and (
-                                (k := '_' + _k) in cls.fields
-                                or (k := k + '_') in cls.fields
-                                )
-                            )
-                        )
-                    }
-                )
-        elif cls.is_snake_case:
-            return cls.from_dict(
-                {
-                    k: v
-                    for _k, v
-                    in rest_obj.items()
-                    if (
-                        (
-                            (
-                                k := utils.camel_case_to_snake_case(_k)
-                                ) in cls.fields
-                            or (k := k + '_') in cls.fields
-                            )
-                        or (
-                            _k.lower().endswith('id')
-                            and (
-                                (
-                                    k := '_' + utils.camel_case_to_snake_case(_k)
-                                    ) in cls.fields
-                                or (k := k + '_') in cls.fields
-                                )
-                            )
-                        )
-                    }
-                )
+
+        return cls.from_dict(rest_obj)
 
     @classmethod
     def from_dict(cls, d: dict[str, typing.Any]) -> 'DocObject':
@@ -578,16 +570,31 @@ class DocObject(metaclass=types.DocMeta):
         return cls(
             **{
                 k: v
-                for __k, v
+                for _k, v
                 in d.items()
-                if (
-                    (k := (_k := __k.strip('_'))) in cls.fields
-                    or (k := '_' + _k) in cls.fields
-                    or (k := _k + '_') in cls.fields
-                    or (k := '_' + _k + '_') in cls.fields
-                    )
+                if (k := cls.key_for(_k))
                 }
             )
+
+    @classmethod
+    @property
+    @functools.lru_cache(maxsize=1)
+    def enumerations(cls) -> dict[str, list]:
+        """Dictionary containing all enums for object."""
+
+        d: dict[str, list] = {}
+        for k, field in cls.fields.items():
+            if (
+                (field_enum := field.metadata.get('enum'))
+                and isinstance(field_enum, enum.EnumMeta)
+                ):
+                d[k] = [e.value for e in field_enum]
+            elif field_enum:
+                d[k] = list(field_enum)
+            if d.get(k) and field.metadata.get('nullable', True):
+                d[k].append(None)
+
+        return d
 
     @classmethod
     @property
@@ -611,7 +618,7 @@ class DocObject(metaclass=types.DocMeta):
     @functools.lru_cache(maxsize=1)
     def distribution(cls) -> str:
         """
-        The Docent distribution to which the object belongs, or,
+        The docent distribution to which the object belongs, or,
         if the object is a member of another package, the name
         of that package.
         """
@@ -706,7 +713,7 @@ class DocObject(metaclass=types.DocMeta):
 @dataclasses.dataclass
 class DocRecords(abc.ABC, DocObject):
     """
-    Base Docent Container Object.
+    Base docent Container Object.
 
     ---
 

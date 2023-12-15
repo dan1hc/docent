@@ -20,7 +20,7 @@ Usage
 import docent.rest
 ```
 
-##### Serve an API created with Docent from command line on your local machine.
+##### Serve an API created with docent from command line on your local machine.
 
 ```sh
 $ docent-serve name_of_your_api_package
@@ -43,7 +43,7 @@ from . import handler
 from . import healthz
 from . import objects
 from . import resource
-from . import route
+from . import api
 from . import utils
 
 from .objects import (
@@ -54,9 +54,9 @@ from .objects import (
 from .resource import (
     Resource,
     )
-from .route import (
-    Route,
-    RouteMeta,
+from .api import (
+    API,
+    APIMeta,
     )
 
 __version__ = docent.core.__version__

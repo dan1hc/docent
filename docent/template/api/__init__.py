@@ -16,8 +16,17 @@ level \_\_init\_\_.py file of the docent.template.api package._
 """
 
 import docent.core
+import docent.rest
 
 from . import apis
 from . import core
 
 __version__ = docent.core.__version__
+
+docent.rest.APIMeta.AUTHORIZERS = [
+    docent.rest.objects.security.Authorizer(
+        name='x-docent-api-key',
+        in_=docent.rest.enums.parameter.In.header.value,
+        type=docent.rest.enums.security.SecurityScheme.apiKey.value,
+        ),
+    ]

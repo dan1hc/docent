@@ -1,6 +1,7 @@
 from . import base
 from . import constants
 from . import documentation
+from . import enumeration
 from . import method
 from . import parameter
 from . import path

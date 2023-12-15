@@ -9,11 +9,7 @@ class Constants(constants.PetsNameSpaceConstants):
     """Constant values specific only to POST."""
 
 
-@resource.Pets.POST_MANY(
-    authorizers=Constants.DEFAULT_AUTHORIZERS,
-    request_headers=Constants.DEFAULT_REQUEST_HEADERS,
-    response_headers=Constants.DEFAULT_RESPONSE_HEADERS,
-    )
+@resource.Pets.POST_MANY
 def create_pets(
     request: docent.rest.Request  # The function should only ever take an docent.rest.Request
     ) -> list[docent.template.package.objects.Pet]:  # You MUST annotate the return signature.

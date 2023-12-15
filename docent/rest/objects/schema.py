@@ -312,7 +312,7 @@ class SchemaObject(SchemaComponent):  # noqa
                         field_enum.append(None)
                 schema.enum = field_enum
 
-            if (instance_value := getattr(obj, k)) != schema.default:
+            if (instance_value := obj[k]) != schema.default:
                 schema.default = instance_value
 
             dbo[k] = schema

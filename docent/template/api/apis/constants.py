@@ -18,19 +18,3 @@ class ApiConstants(core.constants.PackageConstants):
                 ]
             )
         )
-    DEFAULT_RESPONSE_HEADERS: docent.rest.objects.response.Headers = (
-        docent.rest.objects.response.Headers.from_list(
-            [
-                docent.rest.objects.response.Header(
-                    header.value,
-                    description=(
-                        docent.rest.enums.header.DefaultHeaderValues[
-                            header.name
-                            ].value
-                        )
-                    )
-                for header
-                in docent.rest.enums.header.DefaultHeaders
-                ]
-            )
-        )

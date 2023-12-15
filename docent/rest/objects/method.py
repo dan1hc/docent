@@ -89,6 +89,21 @@ class Method(base.Component):  # noqa
                         'resource.'
                         )
                     )
+            elif (
+                hasattr(return_type, '__args__')
+                and isinstance(
+                    return_type := return_type.__args__[0],
+                    (docent.core.DocObject, docent.core.DocMeta)
+                    )
+                ):
+                self.summary = ' '.join(
+                    (
+                        method_name,
+                        'method for the',
+                        return_type.__name__,
+                        'resource.'
+                        )
+                    )
             else:
                 self.summary = ' '.join(
                     (
@@ -96,6 +111,11 @@ class Method(base.Component):  # noqa
                         'method for the specified resource.'
                         )
                     )
+            if (
+                'HeartBeat resource' in self.summary
+                or 'Enumeration resource' in self.summary
+                ):
+                self.summary = self.summary.replace(' (MANY)', '')
         if self.description:
             self.description = '\n'.join(
                 [

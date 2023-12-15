@@ -23,7 +23,7 @@ Implement _once_, document _once_, in _one_ place.
 > subsidiaries via publication to the Python Software Foundation's
 > publicly distributed Python Package Index.
 >
-> With Docent, you will quickly learn established best practice...
+> With docent, you will quickly learn established best practice...
 > or face the consequences of runtime errors that will break your code
 > if you deviate from it.
 >
@@ -31,7 +31,7 @@ Implement _once_, document _once_, in _one_ place.
 > that expects and rewards intuitive magic method implementations,
 > consistent type annotations, and robust docstrings.
 >
-> Implement _pythonically_ with Docent and you will only ever need to:
+> Implement _pythonically_ with docent and you will only ever need to:
 > implement _once_, document _once_, in _one_ place.
 
 ---
@@ -52,7 +52,7 @@ Implement _once_, document _once_, in _one_ place.
     ```
 
 #### The Template
-* Docent ships with a template API and python package.
+* docent ships with a template API and python package.
     * You can immediately run the template API from the command line with:
         * `$ docent-serve docent.template.api`
         * Access in your browser at [http://localhost/docs](http://localhost/docs)
@@ -80,7 +80,7 @@ and copy / paste contents for their needs.
     import docent.rest
     ```
 
-* Serve an API created with Docent from command line on your local machine via:
+* Serve an API created with docent from command line on your local machine via:
 
     ```sh
     $ docent-serve name_of_your_api_package
@@ -96,22 +96,71 @@ and copy / paste contents for their needs.
 
 ## Planned Features
 
+* #### Automatic Endpoint Suffix for Enums / Schema
+    * docent should automatically make available resource-level suffices
+    that return enums / schema requirements.
 * #### Authentication / Authorization Framework
-    * Although Docent supports the specification of auth components, there
+    * Although docent supports the specification of auth components, there
     is currently no functionality that automatically validates a request against
     a specified authenticator / authorizer.
 * #### Unit Tests
-    * Docent is currently at approximately 0% code coverage and will
+    * docent is currently at approximately 0% code coverage and will
     need unit tests authored.
 * #### Full OpenAPI Support
-    * Docent will eventually support all aspects of an OpenAPI specification.
+    * docent will eventually support all aspects of an OpenAPI specification.
     Currently, certain functionality is not supported (and not necessarily
     documented).
 * #### 3rd-party Integrations
-    * Docent will offer extensions to make integrating with other commonly
+    * docent will offer extensions to make integrating with other commonly
     used tools easier. For example, a docent\[aws\] distribution is planned
     to help users get off the ground quickly with tools like AWS API Gateway
     and AWS Lambda.
+* #### Dunder Access
+    * To be fully pythonic: `DocObject` (and `DocMeta`) should be modified
+    to support querying by special method. In docent's perfect world,
+    there would be only *one* way to query for `DocObjects` in *every*
+    kind of database, and it should essentially work as follows.
+
+        ```py
+        import dataclasses
+
+        import docent.core
+
+        from . import clients
+
+
+        @dataclasses.dataclass
+        class Pet(docent.core.DocObject):  # noqa
+
+            name: str = None
+            weight: float = None
+            ...
+
+        # In this situation, the following should work.
+        query = (Pet.weight > 10) & (Pet.weight <= 20)
+        pets: list[Pet] = clients.Mongo[query.as_mongo]
+
+        # This means a DocObject's __getattribute__(self, __name),
+        # when __name is a member of DocObject.fields,
+        # should return an object (let's call it a DocField)
+        # instead of the DocObject's value for the field.
+
+        # Subsequently, outputs from a DocField's
+        # __gt__, __lte__, etc. should return a Query object
+        # representing the expression. The Query object
+        # should be easily chained with others via & and |
+        # operators.
+
+        # In turn, this Query should then be able to be
+        # translated into some pre-selected subset of db
+        # query languages (pymongo, sqlalchemy, etc) via
+        # some property like query.as_sql.
+
+        # Finally, the actual query language into which the Query
+        # object must be transformed can be determined by the
+        # client implementation consuming it.
+
+        ```
 
 ---
 
@@ -121,12 +170,12 @@ and copy / paste contents for their needs.
     * While `$ docent-serve` leverages a simple webserver to make your
     application available for local development, this server is highly
     insecure and should _never_ be used in production.
-    * It is currently up to the developer to integrate Docent applications
+    * It is currently up to the developer to integrate docent applications
     with a third-party webserver for production. This may change.
 * #### Framework Integration
     * Similar to the case for webserver integration (though likely
     mutually exclusive with it), it may be beneficial in the future to allow
-    Docent to integrate with other, similar frameworks like FastAPI and Flask.
+    docent to integrate with other, similar frameworks like FastAPI and Flask.
 
 ---
 
@@ -137,13 +186,13 @@ and copy / paste contents for their needs.
 * docs
     * This directory contains the documentation conf.py file
     and .rst templates used by Sphinx to auto-generate
-    Docent's documentation wiki.
+    docent's documentation wiki.
 * LICENSE
     * The file containing the LICENSE for this software.
     You absolutely _should_ have one of these.
-    * Docent's license, the GNU LGPL, allows for commercial
+    * docent's license, the GNU LGPL, allows for commercial
     use, but is not necessarily proprietary.
-    * While I wanted to make Docent available for commerical use
+    * While I wanted to make docent available for commerical use
     to the widest possible audience, in most cases,
     if you're employed by someone else, you will probably want to use a
     proprietary license.

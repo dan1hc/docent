@@ -138,6 +138,9 @@ def get_central_log() -> logging.Logger:
         else:
             fn, lno, func = "(unknown file)", 0, "(unknown function)"
 
+        if msg == '%s' and args:
+            msg = args[0]
+
         if isinstance(msg, str):
             if level == logging.WARNING:
                 indices: list[int] = []
@@ -158,7 +161,7 @@ def get_central_log() -> logging.Logger:
                     indices.append(len(s))
                 elif len(indices) < 1:
                     indices = [0, len(s)]
-                if (
+                if len(s) > 1 and (
                     printed := Constants.NEW_LINE_TOKEN.join(
                         s[indices[0] + 1:indices[1]]
                         )

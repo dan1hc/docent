@@ -588,16 +588,18 @@ class DocObject(metaclass=types.DocMeta):
         """Dictionary containing all enums for object."""
 
         d: dict[str, list] = {}
+        cls.fields: dict[str, dataclasses.Field]
         for k, field in cls.fields.items():
             if (
                 (field_enum := field.metadata.get('enum'))
                 and isinstance(field_enum, enum.EnumMeta)
                 ):
-                d[k] = [e.value for e in field_enum]
+                field_enum: enum.Enum
+                d[utils.to_camel_case(k)] = [e.value for e in field_enum]
             elif field_enum:
-                d[k] = list(field_enum)
+                d[utils.to_camel_case(k)] = list(field_enum)
             if d.get(k) and field.metadata.get('nullable', True):
-                d[k].append(None)
+                d[utils.to_camel_case(k)].append(None)
 
         return d
 

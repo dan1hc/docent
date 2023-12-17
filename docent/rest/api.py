@@ -115,7 +115,10 @@ class APIMeta(type):  # noqa
                     )
                 )
 
-        if not cls.APPLICATION:
+        if (
+            not cls.APPLICATION
+            and not rsc.__module__.startswith('docent.rest')
+            ):
             cls.APPLICATION = rsc.__module__.split('.')[0]
 
         return rsc
@@ -324,7 +327,6 @@ class API(metaclass=APIMeta):
                     },
                 )
         except Exception as exception:
-            api_module = rsc.__module__.split('.')[0]
             most_recent_trace = traceback.format_tb(
                 exception.__traceback__
                 )[-1]
@@ -333,7 +335,7 @@ class API(metaclass=APIMeta):
             else:
                 file_name, _, trace = spl
                 is_error_raised = ' raise ' in trace
-                is_error_from_api = api_module in file_name
+                is_error_from_api = cls.APPLICATION in file_name
             if is_error_raised or is_error_from_api:
                 response_obj = objects.response.Error.from_exception(exception)
             else:

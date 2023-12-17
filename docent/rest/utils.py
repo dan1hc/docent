@@ -226,7 +226,7 @@ def spec_from_api(
                     )
                 )
 
-    api = importlib.import_module(args[1])
+    api_module = importlib.import_module(args[1])
 
     from . import objects
     from . import api
@@ -282,7 +282,7 @@ def spec_from_api(
         ) and (app_title_arg := app_title_args[0]):
         app_title = app_title_arg.split('=')[-1]
     else:
-        app_title = docent.core.utils.to_camel_case(api.__name__)
+        app_title = docent.core.utils.to_camel_case(api_module.__name__)
 
     if (
         app_version_args := [
@@ -293,8 +293,8 @@ def spec_from_api(
         ) and (app_version_arg := app_version_args[0]):
         app_version = app_version_arg.split('=')[-1]
     else:
-        app_version = getattr(api, '__version__') if hasattr(
-            api,
+        app_version = getattr(api_module, '__version__') if hasattr(
+            api_module,
             '__version__'
             ) else default_app_version
 
@@ -330,7 +330,7 @@ def spec_from_api(
                     ),
                 '\n',
                 '---',
-                (api.__doc__ or '')
+                (api_module.__doc__ or '')
                 )
             ),
         'version': f'v{app_version}',
@@ -352,8 +352,6 @@ def spec_from_api(
             if path:
                 if _verbose:
                     docent.core.log.info(path._name)
-                else:
-                    docent.core.log.debug(path._name)
                 _paths.update(path.as_component)
         desc = (
             (

@@ -982,7 +982,6 @@ class Resource(metaclass=objects.base.ComponentMeta):  # noqa
     @property
     @functools.lru_cache(maxsize=1)
     def resource_key(cls) -> str:  # noqa
-        # return '.'.join((cls.__module__, cls.__name__))
         return '.'.join(
             (
                 cls.__module__,

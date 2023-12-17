@@ -14,7 +14,7 @@ class PackageConstants:
     LOG_CUTOFF_LEN = int(os.getenv('LOG_CUTOFF_LEN', 1024))
     LOG_LEVEL      = os.getenv(
         'LOG_LEVEL',
-        'DEBUG' if ENV in {'dev', 'local'} else 'INFO'
+        'DEBUG' if ENV in {'dev', 'develop', 'local'} else 'INFO'
         ).upper()
     NEW_LINE_TOKEN = '||N'
     RE_JSON        = r'((?<!\\)\+)'

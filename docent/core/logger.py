@@ -92,10 +92,19 @@ def get_central_log() -> logging.Logger:
     _print = __builtins__['print']
 
     def _reprint(*args, **kwargs):
-        if Constants.ENV == 'local':
-            warnings.warn(Constants.WARN_MSG)
-            _print(*args, **kwargs)
-        else:
+        if Constants.ENV in {
+            'dev',
+            'develop',
+            'qa',
+            'test',
+            'testing',
+            'stg',
+            'stage',
+            'staging',
+            'uat',
+            'prod',
+            'production',
+            }:
             warnings.warn(
                 '\n' + '\n'.join(
                     (
@@ -104,6 +113,9 @@ def get_central_log() -> logging.Logger:
                         )
                     )
                 )
+        else:
+            warnings.warn(Constants.WARN_MSG)
+            _print(*args, **kwargs)
 
     __builtins__['print'] = _reprint
 
@@ -128,28 +140,43 @@ def get_central_log() -> logging.Logger:
 
         if isinstance(msg, str):
             if level == logging.WARNING:
-                m = Constants.NEW_LINE_TOKEN.join(
-                    spl[1:-1]
+                indices: list[int] = []
+                for i, msg_line in enumerate(s := msg.splitlines()):
                     if (
-                        '.py:' in (spl := msg.splitlines())[0]
-                        and len(spl) > 2
-                        )
-                    else spl[:-1]
-                    )
+                        Constants.SILENCE_MSG == msg_line
+                        or Constants.WARN_MSG == msg_line
+                        ):
+                        indices.append(i)
+                    elif 'warn(' in msg_line and not indices:
+                        indices.append(0)
+                        indices.append(i)
+                        break
+                    elif 'warn(' in msg_line:
+                        indices.append(i)
+                        break
+                if len(indices) == 1:
+                    indices.append(len(s))
+                elif len(indices) < 1:
+                    indices = [0, len(s)]
                 if (
-                    (spl := m.split(Constants.NEW_LINE_TOKEN))[0]
-                    == Constants.SILENCE_MSG
+                    printed := Constants.NEW_LINE_TOKEN.join(
+                        s[indices[0] + 1:indices[1]]
+                        )
                     ):
                     msg = {
-                        'message': utils.prefix_value_to_string(spl[0]),
-                        'printed': utils.prefix_value_to_string(
-                            Constants.NEW_LINE_TOKEN.join(spl[1:])
+                        'message': utils.prefix_value_to_string(s[indices[0]]),
+                        'printed': utils.prefix_value_to_string(printed)
+                        }
+                elif Constants.WARN_MSG in msg:
+                    msg = {'message': Constants.WARN_MSG}
+                elif Constants.SILENCE_MSG in msg:
+                    msg = {'message': Constants.SILENCE_MSG}
+                else:
+                    msg = {
+                        'message': utils.prefix_value_to_string(
+                            Constants.NEW_LINE_TOKEN.join(s)
                             )
                         }
-                elif Constants.WARN_MSG in spl[0]:
-                    msg = {'message': Constants.WARN_MSG}
-                else:
-                    msg = {'message': utils.prefix_value_to_string(m)}
             else:
                 msg = {'message': utils.prefix_value_to_string(msg)}
         elif isinstance(msg, objects.DocObject):

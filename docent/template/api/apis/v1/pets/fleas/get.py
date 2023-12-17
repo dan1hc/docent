@@ -50,7 +50,6 @@ def get_fleas(
     ) -> list[docent.template.package.objects.Flea]:
     """Retrieve as many fleas in the database as match the query."""
 
-    
     if (
         (pet_id := request.params['pet_id'])
         and not (

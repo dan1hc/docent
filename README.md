@@ -96,16 +96,16 @@ and copy / paste contents for their needs.
 
 ## Planned Features
 
-* #### Automatic Endpoint Suffix for Enums / Schema
-    * docent should automatically make available resource-level suffices
-    that return enums / schema requirements.
+* #### ~~Automatic Endpoint Suffix for Enums / Schema~~
+    * ~~docent should automatically make available resource-level suffices~~
+    ~~that return enums / schema requirements.~~
+* #### Unit Tests
+    * docent is currently at approximately 0% code coverage and will
+    need unit tests authored.
 * #### Authentication / Authorization Framework
     * Although docent supports the specification of auth components, there
     is currently no functionality that automatically validates a request against
     a specified authenticator / authorizer.
-* #### Unit Tests
-    * docent is currently at approximately 0% code coverage and will
-    need unit tests authored.
 * #### Full OpenAPI Support
     * docent will eventually support all aspects of an OpenAPI specification.
     Currently, certain functionality is not supported (and not necessarily
@@ -115,6 +115,11 @@ and copy / paste contents for their needs.
     used tools easier. For example, a docent\[aws\] distribution is planned
     to help users get off the ground quickly with tools like AWS API Gateway
     and AWS Lambda.
+
+---
+
+## Features under Consideration
+
 * #### Dunder Access
     * To be fully pythonic: `DocObject` (and `DocMeta`) should be modified
     to support querying by special method. In docent's perfect world,
@@ -161,11 +166,6 @@ and copy / paste contents for their needs.
         # client implementation consuming it.
 
         ```
-
----
-
-## Features under Consideration
-
 * #### Webserver Integration
     * While `$ docent-serve` leverages a simple webserver to make your
     application available for local development, this server is highly

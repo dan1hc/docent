@@ -999,14 +999,7 @@ class Resource(metaclass=objects.base.ComponentMeta):  # noqa
             '/'.join(
                 (
                     parent.path_schema,
-                    '{' + '_'.join(
-                        (
-                            docent.core.utils.camel_case_to_snake_case(
-                                parent.__name__.removesuffix('s')
-                                ),
-                            'id'
-                            )
-                        ) + '}'
+                    '{' + parent._resource_id + '}'
                     )
                 )
             for parent

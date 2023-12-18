@@ -68,7 +68,7 @@ class DocHandler(http.server.BaseHTTPRequestHandler):  # noqa
             path_obj = rsc.PATHS[rsc.resource_key][path_key]
             path_ref_as_list = path_obj._name.split('/')
             path_parameters = {
-                k[1:-1]: v
+                urllib.parse.unquote(k[1:-1]): urllib.parse.unquote(v)
                 for i, v
                 in enumerate(path_as_list)
                 if (

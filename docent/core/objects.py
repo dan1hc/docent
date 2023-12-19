@@ -7,6 +7,7 @@ import abc
 import dataclasses
 import enum
 import functools
+import hashlib
 import json
 import re
 import typing
@@ -343,13 +344,27 @@ class DocObject(metaclass=types.DocMeta):
                         )
                     )
 
-        if (
-            not cls.__module__.startswith('docent.core')
-            and not cls.__module__.startswith('docent.rest')
-            ):
+        if not cls.doc_path.startswith('docent.core'):
             cls.APPLICATION_OBJECTS.setdefault(cls.reference, cls)
 
-        def __repr__(self) -> str:
+        def __hash__(self: 'DocObject') -> int:
+            return int(
+                hashlib.sha1(
+                    Constants.DOC_DELIM.join(
+                        [
+                            str(self[k])
+                            for k
+                            in self.hashable_fields
+                            ]
+                        ).encode()
+                    ).hexdigest(),
+                base=16
+                )
+
+        if not hasattr(cls, '__hash__') or cls.__hash__ is None:
+            cls.__hash__ = __hash__
+
+        def __repr__(self: 'DocObject') -> str:
             return json.dumps(
                 self.as_rest,
                 default=utils.prefix_value_to_string,
@@ -584,6 +599,33 @@ class DocObject(metaclass=types.DocMeta):
     @classmethod
     @property
     @functools.lru_cache(maxsize=1)
+    def hashable_fields(cls) -> list[str]:
+        """
+        Set of minimum fields required to compute a unique hash
+        for the object.
+
+        """
+
+        id_fields: list[str] = []
+        name_fields: list[str] = []
+        for f in cls.fields:
+            if (s := f.strip('_').lower()).endswith('id'):
+                id_fields.append(f)
+            elif s.endswith('key'):
+                id_fields.append(f)
+            elif s.startswith('name') or s.endswith('name'):
+                name_fields.append(f)
+
+        if id_fields:
+            return id_fields
+        elif name_fields:
+            return name_fields
+        else:
+            return list(cls.fields)
+
+    @classmethod
+    @property
+    @functools.lru_cache(maxsize=1)
     def enumerations(cls) -> dict[str, list]:
         """Dictionary containing all enums for object."""
 
@@ -614,7 +656,7 @@ class DocObject(metaclass=types.DocMeta):
                 *[
                     utils.to_camel_case(s)
                     for s
-                    in cls.path.split('.')
+                    in cls.doc_path.split('.')
                     ],
                 utils.to_camel_case(cls.__name__)
                 )
@@ -630,17 +672,17 @@ class DocObject(metaclass=types.DocMeta):
         of that package.
         """
 
-        if 'docent' in cls.path and '.objects' in cls.path:
-            pkg, dist, *_ = cls.path.split('.')
+        if 'docent' in cls.doc_path and '.objects' in cls.doc_path:
+            pkg, dist, *_ = cls.doc_path.split('.')
             dist = dist.replace('_', '-')
             return f'{pkg}[{dist}]'
         else:
-            return cls.path.split('.')[0]
+            return cls.doc_path.split('.')[0]
 
     @classmethod
     @property
     @functools.lru_cache(maxsize=1)
-    def path(cls) -> str:
+    def doc_path(cls) -> str:
         """Full path to object file within its package."""
 
         return cls.__module__

@@ -8,15 +8,11 @@ import docent.core
 DEFAULT_OPENAPI_VERSION = '3.0.1'
 DEFAULT_APP_VERSION = '0.0.1.dev1'
 VALID_ARG_FLAGS = (
-    '--aws-api-gateway',
-    '--aws-lambda',
     '--include-base-path',
-    '--suffix-env',
     '-v',
     '--verbose',
     )
 VALID_KWARG_FLAGS = (
-    '--env',
     '--openapi-version',
     '--title',
     '--url',
@@ -61,20 +57,12 @@ HELP_TEXT = '\n'.join(
         '  * DEFAULT = {python_package_api}.__version__',
         ' '.join(
             (
-                '--env={env}',
-                '::',
-                'App environment.',
-                )
-            ),
-        '  * DEFAULT = dev',
-        ' '.join(
-            (
                 '--url={url}',
                 '::',
                 'Deployment scheme and network address.',
                 )
             ),
-        "  * DEFAULT = os.getenv('HOST', 'localhost')",
+        "  * DEFAULT = os.getenv('HOSTNAME', 'localhost')",
         ' '.join(
             (
                 '--openapi-version={version}',
@@ -86,32 +74,9 @@ HELP_TEXT = '\n'.join(
         f'  * SUPPORTED = 3.0.*',
         ' '.join(
             (
-                '--aws-lambda',
-                '::',
-                'Specifies whether or not deployment should include',
-                'AWS Lambda {proxy+} route.',
-                )
-            ),
-        ' '.join(
-            (
-                '--aws-api-gateway',
-                '::',
-                'Specifies whether or not deployment should account for',
-                'AWS API Gateway requirements.',
-                )
-            ),
-        ' '.join(
-            (
                 '--include-base-path',
                 '::',
                 'Whether or not to suffix primary URL with /{basePath}.',
-                )
-            ),
-        ' '.join(
-            (
-                '--suffix-env',
-                '::',
-                'Whether or not to suffix environment to URL.',
                 )
             ),
         ' '.join(
@@ -173,10 +138,10 @@ def convert():
             'paths',
             'components',
             ):
-            yaml += docent.core.utils.to_yaml({k: spec.pop(k)})
+            yaml += utils.to_yaml({k: spec.pop(k)})
 
         for k in sorted(spec):
-            yaml += docent.core.utils.to_yaml({k: spec.pop(k)})
+            yaml += utils.to_yaml({k: spec.pop(k)})
 
         if '--verbose' in args or '-v' in args:
             docent.core.log.info(yaml)

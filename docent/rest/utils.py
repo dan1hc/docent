@@ -7,6 +7,7 @@ __all__ = (
     'filter_component_uri',
     'sort_on_last_field',
     'spec_from_api',
+    'to_yaml',
     )
 
 import functools
@@ -231,25 +232,7 @@ def spec_from_api(
     from . import objects
     from . import api
 
-    is_aws_lambda = '--aws-lambda' in args
-    is_aws_api_gateway = '--aws-api-gateway' in args
-    include_aws_proxy = is_aws_api_gateway and is_aws_lambda
-
-    if is_aws_lambda or is_aws_api_gateway:
-        try:
-            an_aws = importlib.import_module('docent.aws')
-        except ImportError as e:
-            raise ImportError(
-                ' '.join(
-                    (
-                        'AWS extension required. Install with:',
-                        '$ pip install docent[aws]'
-                        )
-                    )
-                )
-
     include_url_base = '--include-base-path' in args
-    include_env_suffix = '--suffix-env' in args
 
     if (
         openapi_version_args := [
@@ -261,17 +244,6 @@ def spec_from_api(
         openapi_version = openapi_version_arg.split('=')[-1]
     else:
         openapi_version = default_openapi_version
-
-    if (
-        app_env_args := [
-            a
-            for a
-            in args if a.startswith('--env')
-            ]
-        ) and (app_env_arg := app_env_args[0]):
-        app_env = app_env_arg.split('=')[-1]
-    else:
-        app_env = 'dev'
 
     if (
         app_title_args := [
@@ -307,14 +279,11 @@ def spec_from_api(
         ) and (url_root_arg := url_root_args[0]):
         url_root = url_root_arg.split('=')[-1]
     else:
-        url_root = os.getenv('HOST', '/')
+        url_root = os.getenv('HOSTNAME', '/')
 
     server_variables = {}
     if include_url_base:
         url_root += '/{basePath}'
-
-    if app_env.lower() != 'prod' and include_env_suffix:
-        url_root += f'/{app_env}'
 
     info = {
         'title': app_title,
@@ -415,12 +384,6 @@ def spec_from_api(
             }
         )
 
-    if include_aws_proxy:
-        _paths.update(
-            an_aws.objects.lambda_function.utils.
-                get_proxy_plus_template().as_component
-            )
-
     paths: dict[str, dict] = {}
     for k in _paths:
         v = _paths[k]
@@ -439,24 +402,6 @@ def spec_from_api(
         d = {filter_component_name(ref): v for ref, v in d.items()}
         components[component_type] = d
 
-    extensions = {}
-    if is_aws_api_gateway:
-        extensions.update(
-            an_aws.objects.api_gateway.Policy().as_component
-            )
-        extensions.update(
-            an_aws.objects.api_gateway.BinaryMediaTypes(
-                media_types=[
-                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',  # noqa
-                    'image/vnd.microsoft.icon',
-                    'image/x-icon',
-                    'image/ico',
-                    'image/jpeg',
-                    'image/png',
-                    ]
-                ).as_component
-            )
-
     spec = {
         'openapi': openapi_version,
         'info': info,
@@ -464,14 +409,7 @@ def spec_from_api(
         'paths': paths,
         'components': components,
         'tags': tags,
-        **extensions
         }
-
-    if is_aws_api_gateway:
-        spec = convert_open_api_spec(
-            spec,
-            {'default', 'example'}
-            )
 
     return convert_open_api_spec(
         spec,
@@ -494,55 +432,74 @@ def sort_on_last_field(k: typing.Union[str, dict]) -> str:  # noqa
         return str(k)
 
 
-def extract_path_parameters(path: str) -> dict[str, str]:  # noqa
+def to_yaml(e: typing.Any, indent: int = 0) -> str:
+    """Convert a dictionary to a valid yaml string."""
 
-    from . import resource
-    from . import api
-
-    path_as_list = path.split('/')
-    path_parameters = {}
-
-    affixes: list[str] = []
-    for (_, _, rsc) in api.APIMeta.APPLICATION_RESOURCES:
-        affixes.extend(rsc.PATH_PREFICES)
-        affixes.extend(rsc.PATH_SUFFICES)
-        affixes.append(rsc.__name__.lower())
-
-    for resource_meta in api.APIMeta.APPLICATION_RESOURCES:
-        if (
-            resource_meta[0] == 'healthz'
-            and not path_as_list
-            ):
-            return resource_meta[2]
-
-        path_trimmed = '/'.join(
-            [
-                (
-                    resource_meta[0].split('/')[i]
-                    if (
-                        i in resource_meta[1]
-                        and v not in affixes
-                        )
-                    else v
+    yaml = ''
+    if isinstance(e, dict):
+        for i, k in enumerate(sorted(e)):
+            v = e[k]
+            if i > 0:
+                yaml += (' ' * indent)
+            if (
+                (k.isnumeric() and len(k) == 3)
+                or k.startswith('{')
+                ):
+                k = f"'{k}'"
+            yaml += f'{k}:'
+            if isinstance(v, dict):
+                yaml += '\n'
+                if v:
+                    yaml += (' ' * (indent + 2))
+            yaml += to_yaml(v, indent + 2)
+    elif isinstance(e, list):
+        if e and isinstance(e[0], dict) and '$ref' in [0]:
+            sort_on = lambda x: x.get('$ref', '')
+        elif e and isinstance(e[0], dict):
+            sort_on = lambda x: x.get('_name', 'Z')
+        else:
+            sort_on = lambda x: x or 'Z'
+        if e:
+            yaml += '\n'
+            for v in sorted(e, key=sort_on):
+                yaml += (' ' * indent) + '-' + (
+                    ' '
+                    if
+                    isinstance(v, dict)
+                    else
+                    ''
                     )
-                for i, v
-                in enumerate(path_as_list)
-                ]
-            )
+                yaml += to_yaml(v, indent + 2)
+        else:
+            yaml += ' []\n'
+    elif isinstance(e, str) and '\n' in e:
+        strings = e.split('\n')
+        yaml += ' |\n'
+        for s in strings:
+            yaml += (' ' * (indent + 2)) + s + '\n'
+    else:
+        is_boolean = isinstance(e, bool)
+        is_null = e is None
 
-        if resource_meta[0] == path_trimmed:
-            rsc: resource.Resource = resource_meta[2]
-            path_key = rsc.validate_path(path_as_list)
-            path_obj = rsc.PATHS[rsc.resource_key][path_key]
-            path_ref_as_list = path_obj._name.split('/')
-            path_parameters = {
-                k[1:-1]: v
-                for i, v
-                in enumerate(path_as_list)
-                if (
-                    (k := path_ref_as_list[i]).startswith('{')
-                    and k.endswith('}')
-                    )
-                }
+        _e: str = str(e)
+        if '-' in _e or '/' in _e:
+            is_date = (
+                all(s.isnumeric() for s in _e.split('-'))
+                or all(s.isnumeric() for s in _e.split('/'))
+                )
+        else:
+            is_date = False
+        is_reference = _e.startswith('#')
+        is_star = e == '*'
 
-    return path_parameters
+        if is_null:
+            e = 'null'
+        elif is_date or is_reference or is_star:
+            e = f"'{_e}'"
+        elif is_boolean:
+            e = _e.lower()
+
+        yaml += f' {e!s}'
+        yaml += '\n'
+
+    return yaml

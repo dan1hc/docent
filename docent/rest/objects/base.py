@@ -9,8 +9,6 @@ import hashlib
 import json
 import typing
 
-import docent.core
-
 from .. import utils
 
 from . import constants
@@ -21,7 +19,7 @@ class Constants(constants.ComponentConstants):  # noqa
     pass
 
 
-class ComponentMeta(docent.core.types.DocMeta):  # noqa
+class ComponentMeta(type):  # noqa
 
     APPLICATION_COMPONENTS: dict[str, dict[str, 'Component']] = {}
 
@@ -36,12 +34,12 @@ class Component(metaclass=ComponentMeta):  # noqa
 
     def __init_subclass__(cls) -> None:
 
-        def __hash__(cls) -> int:
+        def __hash__(self: 'Component') -> int:
             return int(
                 hashlib.sha1(
                     (
-                        cls._name
-                        or cls.__class__.__name__
+                        self._name
+                        or self.__class__.__name__
                         ).encode()
                     ).hexdigest(),
                 base=16
@@ -50,8 +48,8 @@ class Component(metaclass=ComponentMeta):  # noqa
         if not hasattr(cls, '__hash__') or cls.__hash__ is None:
             cls.__hash__ = __hash__
 
-        def __repr__(cls) -> str:
-            return cls.as_json
+        def __repr__(self: 'Component') -> str:
+            return self.as_json
 
         cls.__repr__ = __repr__
 
@@ -221,7 +219,11 @@ class Component(metaclass=ComponentMeta):  # noqa
     def as_json(self) -> str:
         """Return object as a JSON serialized string."""
 
-        return json.dumps(self.as_component, default=str, indent=2)
+        return json.dumps(
+            self.as_component,
+            default=str,
+            indent=Constants.INDENT
+            )
 
 
 @dataclasses.dataclass

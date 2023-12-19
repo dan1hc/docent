@@ -34,7 +34,7 @@ class DocField:
 
     """
 
-    def __init__(self, name: str, type: typing.Type):
+    def __init__(self, name: str, type: object):
         self.name = name
         self.type = type
 
@@ -87,10 +87,7 @@ class DocMeta(abc.ABCMeta, type):
     def __call__(cls, *args, **kwargs):
         """Register a DocObject derivative as an application object."""
 
-        if (
-            not cls.__module__.startswith('docent.core')
-            and not cls.__module__.startswith('docent.rest')
-            ):
+        if not cls.__module__.startswith('docent.core'):
             cls.APPLICATION_OBJECTS.setdefault(cls.reference, cls)
 
         return super().__call__(*args, **kwargs)
@@ -100,7 +97,7 @@ class DocMeta(abc.ABCMeta, type):
 
         return bool(cls.key_for(key))
 
-    def __getattribute__(cls, __name: str) -> typing.Union[DocField, typing.Any]:
+    def __getattribute__(cls, __name: str) -> typing.Union[DocField, typing.Any]:  # noqa
         """Return DocField instead of field value for uninstantiated DocObject derivatives."""  # noqa
 
         if (

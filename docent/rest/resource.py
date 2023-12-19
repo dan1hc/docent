@@ -63,11 +63,11 @@ def _prepare_method(
                 ) is not None
             }
 
-    authorizers: list[objects.security.Authorizer] = extensions['authorizers']
-    integrations: list[objects.base.Component] = extensions['integrations']
+    authorizers: list[objects.security.Authorizer] = list(set(extensions['authorizers']))  # noqa
+    integrations: list[objects.base.Component] = list(set(extensions['integrations']))  # noqa
     response_headers: objects.response.Headers = extensions['response_headers']  # noqa
     request_headers: objects.parameter.Parameters = extensions['request_headers']  # noqa
-    errors: list[Exception] = extensions['errors']
+    errors: list[Exception] = list(set(extensions['errors']))
 
     if 'return' not in event_handler_function.__annotations__:
         raise exceptions.InvalidReturnSignatureError(

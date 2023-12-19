@@ -9,7 +9,6 @@ __all__ = (
     'redact_log_dict',
     'redact_string',
     'to_camel_case',
-    'to_yaml',
     'snake_case_to_kebab_case',
     )
 
@@ -270,75 +269,3 @@ def to_camel_case(string: str) -> str:
             characters.append(character.lower())
 
     return ''.join(characters)
-
-
-def to_yaml(e: typing.Any, indent: int = 0) -> str:
-    """Convert a dictionary to a valid yaml string."""
-
-    yaml = ''
-    if isinstance(e, dict):
-        for i, k in enumerate(sorted(e)):
-            v = e[k]
-            if i > 0:
-                yaml += (' ' * indent)
-            if (
-                (k.isnumeric() and len(k) == 3)
-                or k.startswith('{')
-                ):
-                k = f"'{k}'"
-            yaml += f'{k}:'
-            if isinstance(v, dict):
-                yaml += '\n'
-                yaml += (' ' * (indent + 2))
-            yaml += to_yaml(v, indent + 2)
-    elif not (is_string := isinstance(e, str)) and isinstance(e, list):
-        if e and isinstance(e[0], dict) and '$ref' in [0]:
-            sort_on = lambda x: x.get('$ref', '')
-        elif e and isinstance(e[0], dict):
-            sort_on = lambda x: x.get('_name', 'Z')
-        else:
-            sort_on = lambda x: x or 'Z'
-        if e:
-            yaml += '\n'
-            for v in sorted(e, key=sort_on):
-                yaml += (' ' * indent) + '-' + (
-                    ' '
-                    if
-                    isinstance(v, dict)
-                    else
-                    ''
-                    )
-                yaml += to_yaml(v, indent + 2)
-        else:
-            yaml += ' []\n'
-    elif is_string and '\n' in e:
-        strings = e.split('\n')
-        yaml += ' |\n'
-        for s in strings:
-            yaml += (' ' * (indent + 2)) + s + '\n'
-    else:
-        is_boolean = isinstance(e, bool)
-        is_null = e is None
-
-        _e: str = str(e)
-        if '-' in _e or '/' in _e:
-            is_date = (
-                all(s.isnumeric() for s in _e.split('-'))
-                or all(s.isnumeric() for s in _e.split('/'))
-                )
-        else:
-            is_date = False
-        is_reference = _e.startswith('#')
-        is_star = e == '*'
-
-        if is_null:
-            e = 'null'
-        elif is_date or is_reference or is_star:
-            e = f"'{_e}'"
-        elif is_boolean:
-            e = _e.lower()
-
-        yaml += f' {e!s}'
-        yaml += '\n'
-
-    return yaml

@@ -13,8 +13,8 @@ import string
 import docent.core
 
 from .. import static
+from .. import utils
 
-from . import base
 from . import constants
 
 
@@ -69,11 +69,11 @@ class SwaggerYAML(docent.core.objects.DocObject):  # noqa
                 'components',
                 )
             ):
-            yaml += docent.core.utils.to_yaml({k: self.data[k]})
+            yaml += utils.to_yaml({k: self.data[k]})
 
         for k in sorted(self.data):
             if k not in standard_keys:
-                yaml += docent.core.utils.to_yaml({k: self.data[k]})
+                yaml += utils.to_yaml({k: self.data[k]})
 
         self.data = yaml
 

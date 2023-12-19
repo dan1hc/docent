@@ -22,8 +22,8 @@ Implement _once_, document _once_, in _one_ place.
 > to both benefit the widest possible audience and make
 > installations themselves easier across Annalect
 > and all other [Omnicom Group](https://omnicomgroup.com)
-> subsidiaries via publication to the Python Software Foundation's
-> publicly distributed Python Package Index.
+> subsidiaries via publication to the [Python Software Foundation's](https://www.python.org/psf-landing/)
+> publicly distributed [Python Package Index](https://pypi.org/project/docent/).
 >
 > With docent, you will quickly learn established best practice...
 > or face the consequences of runtime errors that will break your code
@@ -47,7 +47,7 @@ Install from command line, with pip:
 
 `$ pip install docent`
 
-To install from source repository:
+To install from [source repository](https://github.com/dan1hc/docent):
 
 ```sh
 $ git clone git@github.com:dan1hc/docent.git

@@ -47,7 +47,7 @@ Install from command line, with pip:
 
 `$ pip install docent`
 
-To install from source repository:
+To install from [source repository](https://github.com/dan1hc/docent):
 
 ```sh
 $ git clone git@github.com:dan1hc/docent.git
